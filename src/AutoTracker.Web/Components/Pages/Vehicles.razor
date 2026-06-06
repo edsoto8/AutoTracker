@@ -1,0 +1,111 @@
+@page "/vehicles"
+@rendermode InteractiveServer
+@inject IVehicleRepository VehicleRepo
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Vehicles — AutoTracker</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Vehicles</MudText>
+
+<MudButton Variant="Variant.Filled" Color="Color.Primary"
+           StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddDialog" Class="mb-4">
+    Add Vehicle
+</MudButton>
+
+@if (_vehicles is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_vehicles.Count == 0)
+{
+    <MudAlert Severity="Severity.Info" Icon="@Icons.Material.Filled.DirectionsCar">
+        No vehicles yet. Add your first vehicle to get started.
+    </MudAlert>
+}
+else
+{
+    <MudDataGrid T="Vehicle" Items="_vehicles" SortMode="SortMode.Multiple"
+                 Filterable="true" Dense="true" Hover="true" Striped="true" Elevation="2">
+        <Columns>
+            <PropertyColumn Property="x => x.Name" Title="Name" />
+            <PropertyColumn Property="x => x.Year" Title="Year" />
+            <PropertyColumn Property="x => x.Make" Title="Make" />
+            <PropertyColumn Property="x => x.Model" Title="Model" />
+            <PropertyColumn Property="x => x.FuelType" Title="Fuel Type" />
+            <PropertyColumn Property="x => x.LicensePlate" Title="License Plate" />
+            <TemplateColumn Title="" CellClass="d-flex justify-end gap-1" Sortable="false" Filterable="false">
+                <CellTemplate>
+                    <MudTooltip Text="View details">
+                        <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small"
+                                       Href="@($"vehicles/{context.Item.Id}")" />
+                    </MudTooltip>
+                    <MudTooltip Text="Edit">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       OnClick="@(() => OpenEditDialog(context.Item))" />
+                    </MudTooltip>
+                    <MudTooltip Text="Delete">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                       Color="Color.Error" OnClick="@(() => DeleteVehicle(context.Item))" />
+                    </MudTooltip>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+    </MudDataGrid>
+}
+
+@code {
+    private List<Vehicle>? _vehicles;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+        => _vehicles = (await VehicleRepo.GetAllAsync()).ToList();
+
+    private async Task OpenAddDialog()
+    {
+        var dialog = await DialogService.ShowAsync<VehicleDialog>("Add Vehicle");
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadAsync();
+            Snackbar.Add("Vehicle added.", Severity.Success);
+        }
+    }
+
+    private async Task OpenEditDialog(Vehicle vehicle)
+    {
+        var parameters = new DialogParameters<VehicleDialog> { { x => x.Vehicle, vehicle } };
+        var dialog = await DialogService.ShowAsync<VehicleDialog>("Edit Vehicle", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadAsync();
+            Snackbar.Add("Vehicle updated.", Severity.Success);
+        }
+    }
+
+    private async Task DeleteVehicle(Vehicle vehicle)
+    {
+        if (await VehicleRepo.HasDependentsAsync(vehicle.Id))
+        {
+            Snackbar.Add("Cannot delete — this vehicle has fuel logs, maintenance records, or expenses. Remove those first.", Severity.Error);
+            return;
+        }
+
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Message, $"Delete \"{vehicle.Name}\"? This cannot be undone." },
+            { x => x.ConfirmText, "Delete" }
+        };
+        var confirmDialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Vehicle", parameters);
+        var confirmed = await confirmDialog.Result;
+
+        if (confirmed is { Canceled: false })
+        {
+            await VehicleRepo.DeleteAsync(vehicle.Id);
+            await LoadAsync();
+            Snackbar.Add("Vehicle deleted.", Severity.Success);
+        }
+    }
+}

@@ -1,0 +1,89 @@
+@page "/vehicles/{Id:int}"
+@rendermode InteractiveServer
+@inject IVehicleRepository VehicleRepo
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>@(_vehicle?.Name ?? "Vehicle") — AutoTracker</PageTitle>
+
+@if (_vehicle is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-2 pa-0" />
+
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4" Spacing="2">
+        <div>
+            <MudText Typo="Typo.h4">@_vehicle.Name</MudText>
+            <MudText Typo="Typo.subtitle1" Color="Color.Secondary">
+                @_vehicle.Year @_vehicle.Make @_vehicle.Model
+            </MudText>
+        </div>
+        <MudSpacer />
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Edit"
+                   OnClick="OpenEditDialog">Edit</MudButton>
+    </MudStack>
+
+    <MudGrid Class="mb-6" Spacing="2">
+        <MudItem xs="6" sm="3">
+            <MudField Label="Fuel Type" Variant="Variant.Outlined">@_vehicle.FuelType</MudField>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudField Label="Tank Capacity" Variant="Variant.Outlined">
+                @(_vehicle.TankCapacity.HasValue ? $"{_vehicle.TankCapacity} gal" : "—")
+            </MudField>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudField Label="VIN" Variant="Variant.Outlined">@(_vehicle.VIN ?? "—")</MudField>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudField Label="License Plate" Variant="Variant.Outlined">@(_vehicle.LicensePlate ?? "—")</MudField>
+        </MudItem>
+    </MudGrid>
+
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true">
+        <MudTabPanel Text="Fuel Logs" Icon="@Icons.Material.Filled.LocalGasStation">
+            <MudText Color="Color.Secondary">Fuel log data available in the Fuel Logs iteration.</MudText>
+        </MudTabPanel>
+        <MudTabPanel Text="Maintenance" Icon="@Icons.Material.Filled.Build">
+            <MudText Color="Color.Secondary">Maintenance data available in the Maintenance iteration.</MudText>
+        </MudTabPanel>
+        <MudTabPanel Text="Expenses" Icon="@Icons.Material.Filled.Receipt">
+            <MudText Color="Color.Secondary">Expense data available in the Expenses iteration.</MudText>
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Vehicle? _vehicle;
+
+    private List<BreadcrumbItem> _breadcrumbs =
+    [
+        new("Vehicles", href: "vehicles"),
+        new("Detail", href: null, disabled: true)
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _vehicle = await VehicleRepo.GetByIdAsync(Id);
+        if (_vehicle is not null)
+            _breadcrumbs[1] = new BreadcrumbItem(_vehicle.Name, href: null, disabled: true);
+    }
+
+    private async Task OpenEditDialog()
+    {
+        var parameters = new DialogParameters<VehicleDialog> { { x => x.Vehicle, _vehicle } };
+        var dialog = await DialogService.ShowAsync<VehicleDialog>("Edit Vehicle", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            _vehicle = await VehicleRepo.GetByIdAsync(Id);
+            Snackbar.Add("Vehicle updated.", Severity.Success);
+        }
+    }
+}

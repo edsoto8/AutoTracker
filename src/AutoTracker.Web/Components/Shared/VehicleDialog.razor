@@ -1,0 +1,85 @@
+@inject IVehicleRepository VehicleRepo
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudGrid Spacing="2">
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_model.Name" Label="Name" Required="true"
+                                  RequiredError="Name is required." MaxLength="100" Immediate="true" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudNumericField @bind-Value="_model.Year" Label="Year" Required="true"
+                                     Min="1885" Max="@(DateTime.Now.Year + 1)" Immediate="true" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_model.Make" Label="Make" Required="true"
+                                  RequiredError="Make is required." MaxLength="100" Immediate="true" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_model.Model" Label="Model" Required="true"
+                                  RequiredError="Model is required." MaxLength="100" Immediate="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect @bind-Value="_model.FuelType" Label="Fuel Type" Required="true">
+                        @foreach (var ft in Enum.GetValues<FuelType>())
+                        {
+                            <MudSelectItem Value="ft">@ft</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="_model.TankCapacity" Label="Tank Capacity (gal)"
+                                     HideSpinButtons="true" Min="0" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_model.VIN" Label="VIN (optional)" MaxLength="17" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_model.LicensePlate" Label="License Plate (optional)" MaxLength="20" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public Vehicle? Vehicle { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private Vehicle _model = new();
+
+    protected override void OnParametersSet()
+    {
+        _model = Vehicle is not null
+            ? new Vehicle
+            {
+                Id = Vehicle.Id, Name = Vehicle.Name, Year = Vehicle.Year,
+                Make = Vehicle.Make, Model = Vehicle.Model, VIN = Vehicle.VIN,
+                LicensePlate = Vehicle.LicensePlate, FuelType = Vehicle.FuelType,
+                TankCapacity = Vehicle.TankCapacity
+            }
+            : new Vehicle { Year = DateTime.Now.Year, FuelType = FuelType.Gasoline };
+    }
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_isValid) return;
+
+        if (Vehicle is null)
+            await VehicleRepo.AddAsync(_model);
+        else
+            await VehicleRepo.UpdateAsync(_model);
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
