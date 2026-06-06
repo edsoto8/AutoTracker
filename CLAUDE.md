@@ -1,0 +1,76 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project
+
+**Command Vault** — a local-first vehicle management app for tracking fuel logs, maintenance records, and expenses. Stores data in SQLite via Dapper. Exposes a Spectre.Console CLI and a Blazor Web UI.
+
+## Technology Stack
+
+- **.NET 10**, C#
+- **SQLite + Dapper** (no Entity Framework)
+- **Spectre.Console** for the CLI
+- **Blazor Web App** for the UI
+- **Serilog** for logging (console + file)
+- **xUnit** for tests
+
+## Solution Structure
+
+```
+CommandVault.sln
+src/
+  CommandVault.Core          # Domain models, interfaces
+  CommandVault.Data          # Dapper repositories, SQLite schema
+  CommandVault.ImportExport  # CSV/JSON import and export
+  CommandVault.Cli           # Spectre.Console entry point
+  CommandVault.Web           # Blazor Web App
+tests/
+  CommandVault.Core.Tests
+  CommandVault.Data.Tests
+  CommandVault.ImportExport.Tests
+```
+
+## Common Commands
+
+```bash
+# Build entire solution
+dotnet build
+
+# Run CLI
+dotnet run --project src/CommandVault.Cli
+
+# Run web app
+dotnet run --project src/CommandVault.Web
+
+# Run all tests
+dotnet test
+
+# Run a single test project
+dotnet test tests/CommandVault.Data.Tests
+
+# Run a single test by name
+dotnet test --filter "FullyQualifiedName~VehicleRepository"
+```
+
+## Architecture Notes
+
+**Data layer** (`CommandVault.Data`): Repository pattern via interfaces defined in `CommandVault.Core` (`IVehicleRepository`, `IFuelLogRepository`, `IMaintenanceRepository`, `IExpenseRepository`). Concrete implementations use Dapper against a single SQLite file (`commandvault.db`). Schema migrations are owned by this project.
+
+**Core** (`CommandVault.Core`): Domain models (Vehicle, FuelLog, MaintenanceLog, Expense) and computed values (MPG, cost-per-mile). No infrastructure dependencies.
+
+**CLI** (`CommandVault.Cli`): Spectre.Console commands follow the pattern `commandvault <noun> <verb>` (e.g. `commandvault vehicle list`). Commands depend on `CommandVault.Core` interfaces; repositories are injected.
+
+**Web** (`CommandVault.Web`): Blazor pages at `/`, `/vehicles`, `/fuel`, `/maintenance`, `/expenses`, `/import-export`. Shares the same repository interfaces as the CLI.
+
+**ImportExport** (`CommandVault.ImportExport`): CSV and JSON round-trips for all four entity types. Must validate imported rows, skip invalid ones, and return an import summary.
+
+**Logging**: Serilog is wired at the application entry points (CLI and Web). Log startup, errors, all DB operations, and import/export activity.
+
+## Database
+
+Single file `commandvault.db` with four tables: `Vehicles`, `FuelLogs`, `MaintenanceLogs`, `Expenses`. All access goes through Dapper repositories — raw SQL only, no ORM.
+
+## Fuel Log Calculated Values
+
+Computed on read, not stored: MPG, cost-per-mile, miles-since-last-fill-up. These belong in `CommandVault.Core` and are unit-tested there.
