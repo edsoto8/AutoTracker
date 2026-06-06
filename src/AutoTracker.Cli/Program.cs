@@ -1,5 +1,6 @@
 using AutoTracker.Cli.Commands;
 using AutoTracker.Cli.Commands.Expenses;
+using AutoTracker.Cli.Commands.ImportExport;
 using AutoTracker.Cli.Commands.Fuel;
 using AutoTracker.Cli.Commands.Maintenance;
 using AutoTracker.Cli.Commands.Vehicles;
@@ -37,6 +38,10 @@ services.AddTransient<ExpenseListCommand>();
 services.AddTransient<ExpenseAddCommand>();
 services.AddTransient<ExpenseEditCommand>();
 services.AddTransient<ExpenseDeleteCommand>();
+services.AddTransient<ExportCommand>();
+services.AddTransient<ImportCsvCommand>();
+services.AddTransient<ImportLegacyCommand>();
+services.AddTransient<ImportJsonCommand>();
 
 var registrar = new TypeRegistrar(services);
 var app = new CommandApp(registrar);
@@ -64,6 +69,15 @@ app.Configure(config =>
     });
 
     config.AddCommand<SummaryCommand>("summary").WithDescription("Show summary metrics");
+    config.AddCommand<ExportCommand>("export").WithDescription("Export all data to CSV or JSON");
+
+    config.AddBranch("import", import =>
+    {
+        import.SetDescription("Import data");
+        import.AddCommand<ImportCsvCommand>("csv").WithDescription("Import from a CSV file");
+        import.AddCommand<ImportJsonCommand>("json").WithDescription("Import from a JSON file");
+        import.AddCommand<ImportLegacyCommand>("legacy").WithDescription("Import from legacy fuel_export.csv");
+    });
 
     config.AddBranch("expense", expense =>
     {

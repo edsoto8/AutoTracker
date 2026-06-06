@@ -38,8 +38,8 @@ public class VehicleRepository : IVehicleRepository
         using var connection = _factory.CreateConnection();
         await connection.ExecuteAsync(
             """
-            INSERT INTO Vehicles (Name, Year, Make, Model, VIN, LicensePlate, FuelType, TankCapacity)
-            VALUES (@Name, @Year, @Make, @Model, @VIN, @LicensePlate, @FuelType, @TankCapacity)
+            INSERT INTO Vehicles (Id, Name, Year, Make, Model, VIN, LicensePlate, FuelType, TankCapacity)
+            VALUES (NULLIF(@Id, 0), @Name, @Year, @Make, @Model, @VIN, @LicensePlate, @FuelType, @TankCapacity)
             """, vehicle);
         return await connection.ExecuteScalarAsync<int>("SELECT last_insert_rowid()");
     }

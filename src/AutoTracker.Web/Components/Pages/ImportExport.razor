@@ -1,0 +1,267 @@
+@page "/import-export"
+@rendermode InteractiveServer
+@using AutoTracker.ImportExport
+@inject IVehicleRepository VehicleRepo
+@inject IFuelLogRepository FuelRepo
+@inject IMaintenanceRepository MaintenanceRepo
+@inject IExpenseRepository ExpenseRepo
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<PageTitle>Import / Export — AutoTracker</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-6">Import / Export</MudText>
+
+<MudGrid Spacing="4">
+
+    @* ── EXPORT ──────────────────────────────────────────────────────── *@
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-3">Export Data</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                Download your data as CSV or JSON for backup or migration.
+            </MudText>
+
+            <MudText Typo="Typo.subtitle2" Class="mb-2">CSV</MudText>
+            <MudStack Row="true" Spacing="2" Class="mb-4" Wrap="Wrap.Wrap">
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download"
+                           OnClick="@(() => ExportCsv("vehicles"))">Vehicles</MudButton>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download"
+                           OnClick="@(() => ExportCsv("fuel"))">Fuel Logs</MudButton>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download"
+                           OnClick="@(() => ExportCsv("maintenance"))">Maintenance</MudButton>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download"
+                           OnClick="@(() => ExportCsv("expenses"))">Expenses</MudButton>
+            </MudStack>
+
+            <MudText Typo="Typo.subtitle2" Class="mb-2">JSON</MudText>
+            <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download"
+                           OnClick="@(() => ExportJson("vehicles"))">Vehicles</MudButton>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download"
+                           OnClick="@(() => ExportJson("fuel"))">Fuel Logs</MudButton>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download"
+                           OnClick="@(() => ExportJson("maintenance"))">Maintenance</MudButton>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download"
+                           OnClick="@(() => ExportJson("expenses"))">Expenses</MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+
+    @* ── CSV IMPORT ───────────────────────────────────────────────────── *@
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-3">Import CSV</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                Import data from a CSV file previously exported from AutoTracker.
+            </MudText>
+
+            <MudSelect @bind-Value="_importType" Label="Data type" Class="mb-3"
+                       AnchorOrigin="Origin.BottomLeft">
+                <MudSelectItem Value="@("vehicles")">Vehicles</MudSelectItem>
+                <MudSelectItem Value="@("fuel")">Fuel Logs</MudSelectItem>
+                <MudSelectItem Value="@("maintenance")">Maintenance Logs</MudSelectItem>
+                <MudSelectItem Value="@("expenses")">Expenses</MudSelectItem>
+            </MudSelect>
+
+            <InputFile id="csv-input" OnChange="OnCsvFileSelected" accept=".csv" style="display:none" />
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.UploadFile"
+                       OnClick="@(() => ClickInput("csv-input"))" Class="mb-3">Choose File</MudButton>
+            @if (_csvFileName is not null)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="ml-2 d-inline">@_csvFileName</MudText>
+            }
+
+            <div class="mt-3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(_csvContent is null || _importing)"
+                           OnClick="RunCsvImport">Import</MudButton>
+            </div>
+
+            @if (_csvResult is not null)
+            {
+                <MudAlert Severity="@(_csvResult.SkippedCount > 0 ? Severity.Warning : Severity.Success)" Class="mt-3">
+                    Imported: <strong>@_csvResult.Imported</strong> &nbsp; Skipped: <strong>@_csvResult.SkippedCount</strong>
+                </MudAlert>
+                @if (_csvResult.Skipped.Count > 0)
+                {
+                    <MudList T="string" Dense="true" Class="mt-2">
+                        @foreach (var msg in _csvResult.Skipped)
+                        {
+                            <MudListItem Icon="@Icons.Material.Filled.Warning" IconColor="Color.Warning">@msg</MudListItem>
+                        }
+                    </MudList>
+                }
+            }
+        </MudPaper>
+    </MudItem>
+
+    @* ── LEGACY IMPORT ───────────────────────────────────────────────── *@
+    <MudItem xs="12">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-1">Legacy Fuel Import</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                One-time migration from a <code>fuel_export.csv</code> file.
+                Expected columns: <code>Id, Date, PricePerGallon, Gallons, TotalCost, Location, Vehicle, Odometer, FuelType, Notes</code>.
+                Vehicles must already exist by name. Duplicates are skipped automatically.
+            </MudText>
+
+            <InputFile id="legacy-input" OnChange="OnLegacyFileSelected" accept=".csv" style="display:none" />
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.UploadFile"
+                       OnClick="@(() => ClickInput("legacy-input"))" Class="mb-3">Choose File</MudButton>
+            @if (_legacyFileName is not null)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="ml-2 d-inline">@_legacyFileName</MudText>
+            }
+
+            <div class="mt-3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(_legacyContent is null || _importing)"
+                           OnClick="RunLegacyImport">Import</MudButton>
+            </div>
+
+            @if (_legacyResult is not null)
+            {
+                <MudAlert Severity="@(_legacyResult.SkippedCount > 0 ? Severity.Warning : Severity.Success)" Class="mt-3">
+                    Imported: <strong>@_legacyResult.Imported</strong> &nbsp; Skipped: <strong>@_legacyResult.SkippedCount</strong>
+                </MudAlert>
+                @if (_legacyResult.Skipped.Count > 0)
+                {
+                    <MudList T="string" Dense="true" Class="mt-2">
+                        @foreach (var msg in _legacyResult.Skipped)
+                        {
+                            <MudListItem Icon="@Icons.Material.Filled.Warning" IconColor="Color.Warning">@msg</MudListItem>
+                        }
+                    </MudList>
+                }
+            }
+        </MudPaper>
+    </MudItem>
+
+</MudGrid>
+
+@code {
+    private string _importType = "fuel";
+    private string? _csvFileName;
+    private string? _csvContent;
+    private string? _legacyFileName;
+    private string? _legacyContent;
+    private bool _importing;
+    private ImportResult? _csvResult;
+    private ImportResult? _legacyResult;
+
+    // ── Export ────────────────────────────────────────────────────────────────
+
+    private async Task ExportCsv(string type)
+    {
+        var (content, filename) = type switch
+        {
+            "vehicles"    => (DataExporter.ExportVehiclesCsv(await GetVehicles()), "vehicles.csv"),
+            "fuel"        => (DataExporter.ExportFuelLogsCsv(await GetFuelLogs()), "fuel_logs.csv"),
+            "maintenance" => (DataExporter.ExportMaintenanceLogsCsv(await GetMaintenance()), "maintenance_logs.csv"),
+            "expenses"    => (DataExporter.ExportExpensesCsv(await GetExpenses()), "expenses.csv"),
+            _             => throw new ArgumentOutOfRangeException()
+        };
+        await JS.InvokeVoidAsync("downloadText", filename, "text/csv", content);
+    }
+
+    private async Task ExportJson(string type)
+    {
+        var (content, filename) = type switch
+        {
+            "vehicles"    => (DataExporter.ExportVehiclesJson(await GetVehicles()), "vehicles.json"),
+            "fuel"        => (DataExporter.ExportFuelLogsJson(await GetFuelLogs()), "fuel_logs.json"),
+            "maintenance" => (DataExporter.ExportMaintenanceLogsJson(await GetMaintenance()), "maintenance_logs.json"),
+            "expenses"    => (DataExporter.ExportExpensesJson(await GetExpenses()), "expenses.json"),
+            _             => throw new ArgumentOutOfRangeException()
+        };
+        await JS.InvokeVoidAsync("downloadText", filename, "application/json", content);
+    }
+
+    // ── File Pickers ──────────────────────────────────────────────────────────
+
+    private async Task ClickInput(string id) =>
+        await JS.InvokeVoidAsync("eval", $"document.getElementById('{id}').click()");
+
+    private async Task OnCsvFileSelected(InputFileChangeEventArgs e)
+    {
+        _csvFileName = e.File.Name;
+        _csvContent = await ReadFileAsync(e.File);
+        _csvResult = null;
+    }
+
+    private async Task OnLegacyFileSelected(InputFileChangeEventArgs e)
+    {
+        _legacyFileName = e.File.Name;
+        _legacyContent = await ReadFileAsync(e.File);
+        _legacyResult = null;
+    }
+
+    private static async Task<string> ReadFileAsync(IBrowserFile file)
+    {
+        using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+        using var reader = new StreamReader(stream);
+        return await reader.ReadToEndAsync();
+    }
+
+    // ── Import ────────────────────────────────────────────────────────────────
+
+    private async Task RunCsvImport()
+    {
+        if (_csvContent is null) return;
+        _importing = true;
+        _csvResult = null;
+
+        var vehicleIds = (await GetVehicles()).Select(v => v.Id).ToList();
+
+        switch (_importType)
+        {
+            case "vehicles":
+                var (vehicles, vr) = DataImporter.ImportVehiclesCsv(_csvContent);
+                foreach (var v in vehicles) await VehicleRepo.AddAsync(v);
+                _csvResult = vr;
+                break;
+            case "fuel":
+                var (fuelLogs, fr) = DataImporter.ImportFuelLogsCsv(_csvContent, vehicleIds);
+                foreach (var l in fuelLogs) await FuelRepo.AddAsync(l);
+                _csvResult = fr;
+                break;
+            case "maintenance":
+                var (maintLogs, mr) = DataImporter.ImportMaintenanceLogsCsv(_csvContent, vehicleIds);
+                foreach (var l in maintLogs) await MaintenanceRepo.AddAsync(l);
+                _csvResult = mr;
+                break;
+            case "expenses":
+                var (expenses, er) = DataImporter.ImportExpensesCsv(_csvContent, vehicleIds);
+                foreach (var ex in expenses) await ExpenseRepo.AddAsync(ex);
+                _csvResult = er;
+                break;
+        }
+
+        Snackbar.Add($"Import complete: {_csvResult?.Imported} imported, {_csvResult?.SkippedCount} skipped.", Severity.Info);
+        _importing = false;
+    }
+
+    private async Task RunLegacyImport()
+    {
+        if (_legacyContent is null) return;
+        _importing = true;
+        _legacyResult = null;
+
+        var vehicles = (await GetVehicles()).ToList();
+        var existingLogs = (await GetFuelLogs()).ToList();
+        var (toImport, result) = LegacyFuelImporter.Import(_legacyContent, vehicles, existingLogs);
+
+        foreach (var log in toImport)
+            await FuelRepo.AddAsync(log);
+
+        _legacyResult = result;
+        Snackbar.Add($"Legacy import complete: {result.Imported} imported, {result.SkippedCount} skipped.", Severity.Info);
+        _importing = false;
+    }
+
+    // ── Data helpers ──────────────────────────────────────────────────────────
+
+    private async Task<IEnumerable<Core.Models.Vehicle>> GetVehicles() => await VehicleRepo.GetAllAsync();
+    private async Task<IEnumerable<Core.Models.FuelLog>> GetFuelLogs() => await FuelRepo.GetAllAsync();
+    private async Task<IEnumerable<Core.Models.MaintenanceLog>> GetMaintenance() => await MaintenanceRepo.GetAllAsync();
+    private async Task<IEnumerable<Core.Models.Expense>> GetExpenses() => await ExpenseRepo.GetAllAsync();
+}
