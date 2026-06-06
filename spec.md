@@ -603,20 +603,19 @@ Cover:
 
 ---
 
-# Initial Development Order
+# Development Order
 
-1. Create solution and projects
-2. Create domain models
-3. Build SQLite database
-4. Implement Dapper repositories
-5. Build Fuel Log functionality
-6. Build Maintenance functionality
-7. Build Expense Tracking
-8. Create Dashboard
-9. Add Import/Export
-10. Add CLI commands
-11. Build Blazor UI
-12. Add Logging and Tests
+Vertical slices — each iteration is reviewable and runnable before moving on.
 
-```
-```
+| # | Iteration              | Scope                                                                                  |
+|---|------------------------|----------------------------------------------------------------------------------------|
+| 1 | Solution scaffold      | Solution, projects, references, NuGet packages                                         |
+| 2 | Core domain models     | Domain classes, enums, computed value logic, unit tests                                |
+| 3 | Database + repositories| SQLite schema, Dapper repositories, repository tests                                   |
+| 4 | Vehicles               | CLI interactive commands + Blazor `/vehicles` and `/vehicles/{id}`                     |
+| 5 | Fuel logs              | CLI + Blazor `/fuel`, computed values, odometer warning                                |
+| 6 | Maintenance logs       | CLI + Blazor `/maintenance`                                                            |
+| 7 | Expenses               | CLI + Blazor `/expenses`                                                               |
+| 8 | Dashboard              | CLI summary + Blazor `/` with MudChart charts                                          |
+| 9 | Import / Export        | CSV/JSON for all types, legacy `fuel_export.csv` migration                             |
+| 10| Polish                 | Serilog, empty states, dark/light theme, remaining test gaps                           |

@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AutoTracker.Cli/AutoTracker.Cli.csproj" />
+    <Project Path="src/AutoTracker.Core/AutoTracker.Core.csproj" />
+    <Project Path="src/AutoTracker.Data/AutoTracker.Data.csproj" />
+    <Project Path="src/AutoTracker.ImportExport/AutoTracker.ImportExport.csproj" />
+    <Project Path="src/AutoTracker.Web/AutoTracker.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AutoTracker.Core.Tests/AutoTracker.Core.Tests.csproj" />
+    <Project Path="tests/AutoTracker.Data.Tests/AutoTracker.Data.Tests.csproj" />
+    <Project Path="tests/AutoTracker.ImportExport.Tests/AutoTracker.ImportExport.Tests.csproj" />
+  </Folder>
+</Solution>
