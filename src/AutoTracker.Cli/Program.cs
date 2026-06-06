@@ -1,4 +1,5 @@
 using AutoTracker.Cli.Commands.Fuel;
+using AutoTracker.Cli.Commands.Maintenance;
 using AutoTracker.Cli.Commands.Vehicles;
 using AutoTracker.Cli.Infrastructure;
 using AutoTracker.Core.Interfaces;
@@ -25,6 +26,10 @@ services.AddTransient<FuelListCommand>();
 services.AddTransient<FuelAddCommand>();
 services.AddTransient<FuelEditCommand>();
 services.AddTransient<FuelDeleteCommand>();
+services.AddTransient<MaintenanceListCommand>();
+services.AddTransient<MaintenanceAddCommand>();
+services.AddTransient<MaintenanceEditCommand>();
+services.AddTransient<MaintenanceDeleteCommand>();
 
 var registrar = new TypeRegistrar(services);
 var app = new CommandApp(registrar);
@@ -49,6 +54,15 @@ app.Configure(config =>
         fuel.AddCommand<FuelAddCommand>("add").WithDescription("Add a fuel log entry");
         fuel.AddCommand<FuelEditCommand>("edit").WithDescription("Edit a fuel log entry");
         fuel.AddCommand<FuelDeleteCommand>("delete").WithDescription("Delete a fuel log entry");
+    });
+
+    config.AddBranch("maintenance", maintenance =>
+    {
+        maintenance.SetDescription("Manage maintenance logs");
+        maintenance.AddCommand<MaintenanceListCommand>("list").WithDescription("List all maintenance logs");
+        maintenance.AddCommand<MaintenanceAddCommand>("add").WithDescription("Add a maintenance log entry");
+        maintenance.AddCommand<MaintenanceEditCommand>("edit").WithDescription("Edit a maintenance log entry");
+        maintenance.AddCommand<MaintenanceDeleteCommand>("delete").WithDescription("Delete a maintenance log entry");
     });
 });
 

@@ -1,0 +1,107 @@
+@inject IVehicleRepository VehicleRepo
+@inject IMaintenanceRepository MaintenanceRepo
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudGrid Spacing="2">
+                <MudItem xs="12">
+                    <MudSelect T="int" Value="_model.VehicleId" Label="Vehicle" Required="true"
+                               RequiredError="Vehicle is required." Disabled="@(PreselectedVehicleId > 0)"
+                               AnchorOrigin="Origin.BottomLeft"
+                               ValueChanged="@((int id) => { _model.VehicleId = id; })">
+                        @foreach (var v in _vehicles)
+                        {
+                            <MudSelectItem Value="v.Id">@v.Name (@v.Year @v.Make @v.Model)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker @bind-Date="_date" Label="Date" Required="true"
+                                   MaxDate="DateTime.Today" DateFormat="yyyy-MM-dd" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="_model.Odometer" Label="Odometer (miles)"
+                                     Required="true" Min="1" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect @bind-Value="_model.ServiceType" Label="Service Type" Required="true"
+                               AnchorOrigin="Origin.BottomLeft">
+                        @foreach (var st in Enum.GetValues<ServiceType>())
+                        {
+                            <MudSelectItem Value="st">@st</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="_model.Cost" Label="Cost ($)" Required="true"
+                                     Min="0m" Format="F2" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_model.Description" Label="Description (optional)" MaxLength="500" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_model.Vendor" Label="Vendor (optional)" MaxLength="200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_model.Notes" Label="Notes (optional)" MaxLength="500" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public MaintenanceLog? MaintenanceLog { get; set; }
+    [Parameter] public int PreselectedVehicleId { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private MaintenanceLog _model = new();
+    private DateTime? _date;
+    private List<Vehicle> _vehicles = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _vehicles = (await VehicleRepo.GetAllAsync()).ToList();
+
+        if (MaintenanceLog is not null)
+        {
+            _model = new MaintenanceLog
+            {
+                Id = MaintenanceLog.Id, VehicleId = MaintenanceLog.VehicleId,
+                Odometer = MaintenanceLog.Odometer, ServiceType = MaintenanceLog.ServiceType,
+                Description = MaintenanceLog.Description, Cost = MaintenanceLog.Cost,
+                Vendor = MaintenanceLog.Vendor, Notes = MaintenanceLog.Notes
+            };
+            _date = MaintenanceLog.Date;
+        }
+        else
+        {
+            _model = new MaintenanceLog { VehicleId = PreselectedVehicleId };
+            _date = DateTime.Today;
+        }
+    }
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_isValid || _date is null) return;
+
+        _model.Date = _date.Value;
+
+        if (MaintenanceLog is null)
+            await MaintenanceRepo.AddAsync(_model);
+        else
+            await MaintenanceRepo.UpdateAsync(_model);
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

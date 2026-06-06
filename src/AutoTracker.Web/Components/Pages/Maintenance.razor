@@ -1,0 +1,153 @@
+@page "/maintenance"
+@rendermode InteractiveServer
+@inject IVehicleRepository VehicleRepo
+@inject IMaintenanceRepository MaintenanceRepo
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Maintenance — AutoTracker</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4" Spacing="2">
+    <MudText Typo="Typo.h4">Maintenance Logs</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+               OnClick="OpenAddDialog">Add Entry</MudButton>
+</MudStack>
+
+<MudSelect T="int" Value="_filterVehicleId" Label="Filter by Vehicle"
+           AnchorOrigin="Origin.BottomLeft" Class="mb-4" Style="max-width:320px;"
+           ValueChanged="@((int id) => OnVehicleFilterChanged(id))">
+    <MudSelectItem Value="0">All Vehicles</MudSelectItem>
+    @foreach (var v in _vehicles)
+    {
+        <MudSelectItem Value="v.Id">@v.Name (@v.Year @v.Make @v.Model)</MudSelectItem>
+    }
+</MudSelect>
+
+@if (_logs is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_logs.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">
+        No maintenance logs found. Use <strong>Add Entry</strong> to record one.
+    </MudAlert>
+}
+else
+{
+    <MudDataGrid T="MaintenanceLog" Items="_logs" Dense="true" Hover="true" Striped="true" Elevation="2">
+        <Columns>
+            <PropertyColumn Property="x => x.Date" Title="Date" Format="yyyy-MM-dd" />
+            <TemplateColumn Title="Vehicle" SortBy="x => _vehicleMap.GetValueOrDefault(x.VehicleId, string.Empty)">
+                <CellTemplate>@_vehicleMap.GetValueOrDefault(context.Item.VehicleId, "?")</CellTemplate>
+            </TemplateColumn>
+            <PropertyColumn Property="x => x.Odometer" Title="Odometer" Format="N0" />
+            <PropertyColumn Property="x => x.ServiceType" Title="Service Type" />
+            <TemplateColumn Title="Cost" SortBy="x => x.Cost">
+                <CellTemplate>$@context.Item.Cost.ToString("F2")</CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="Vendor" SortBy="x => x.Vendor">
+                <CellTemplate>
+                    @if (context.Item.Vendor is not null)
+                    { @context.Item.Vendor }
+                    else
+                    { <MudText Color="Color.Secondary" Typo="Typo.body2">—</MudText> }
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="Description" SortBy="x => x.Description">
+                <CellTemplate>
+                    @if (context.Item.Description is not null)
+                    { @context.Item.Description }
+                    else
+                    { <MudText Color="Color.Secondary" Typo="Typo.body2">—</MudText> }
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="" CellClass="d-flex justify-end gap-1" Sortable="false" Filterable="false">
+                <CellTemplate>
+                    <MudTooltip Text="Edit">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       OnClick="@(() => OpenEditDialog(context.Item))" />
+                    </MudTooltip>
+                    <MudTooltip Text="Delete">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                       Color="Color.Error" OnClick="@(() => DeleteLog(context.Item))" />
+                    </MudTooltip>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+    </MudDataGrid>
+}
+
+@code {
+    private List<MaintenanceLog>? _logs;
+    private List<Vehicle> _vehicles = [];
+    private Dictionary<int, string> _vehicleMap = [];
+    private int _filterVehicleId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _vehicles = (await VehicleRepo.GetAllAsync()).ToList();
+        _vehicleMap = _vehicles.ToDictionary(v => v.Id, v => v.Name);
+        await LoadLogsAsync();
+    }
+
+    private async Task LoadLogsAsync()
+    {
+        IEnumerable<MaintenanceLog> raw = _filterVehicleId > 0
+            ? await MaintenanceRepo.GetByVehicleIdAsync(_filterVehicleId)
+            : await MaintenanceRepo.GetAllAsync();
+
+        _logs = raw.OrderByDescending(l => l.Date).ThenByDescending(l => l.Odometer).ToList();
+    }
+
+    private async Task OnVehicleFilterChanged(int vehicleId)
+    {
+        _filterVehicleId = vehicleId;
+        await LoadLogsAsync();
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters<MaintenanceLogDialog>
+        {
+            { x => x.PreselectedVehicleId, _filterVehicleId }
+        };
+        var dialog = await DialogService.ShowAsync<MaintenanceLogDialog>("Add Maintenance Log", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadLogsAsync();
+            Snackbar.Add("Maintenance log added.", Severity.Success);
+        }
+    }
+
+    private async Task OpenEditDialog(MaintenanceLog log)
+    {
+        var parameters = new DialogParameters<MaintenanceLogDialog> { { x => x.MaintenanceLog, log } };
+        var dialog = await DialogService.ShowAsync<MaintenanceLogDialog>("Edit Maintenance Log", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadLogsAsync();
+            Snackbar.Add("Maintenance log updated.", Severity.Success);
+        }
+    }
+
+    private async Task DeleteLog(MaintenanceLog log)
+    {
+        var confirmParams = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Message, $"Delete {log.ServiceType} on {log.Date:yyyy-MM-dd}? This cannot be undone." },
+            { x => x.ConfirmText, "Delete" }
+        };
+        var confirmDialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Maintenance Log", confirmParams);
+        var confirmed = await confirmDialog.Result;
+        if (confirmed is { Canceled: false })
+        {
+            await MaintenanceRepo.DeleteAsync(log.Id);
+            await LoadLogsAsync();
+            Snackbar.Add("Maintenance log deleted.", Severity.Success);
+        }
+    }
+}
