@@ -2,6 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Status
+
+**Do not write any code yet.** The spec has open TODO sections that must be finalized first:
+- Database schema (column types, nullability, indexes)
+- Cascade delete behavior
+- Field validation rules
+- Computed value formulas
+- Default sort orders
+- Post-action navigation
+- Empty/zero state handling
+- CLI UX mode (interactive vs flag-based)
+
 ## Project
 
 **Command Vault** — a local-first vehicle management app for tracking fuel logs, maintenance records, and expenses. Stores data in SQLite via Dapper. Exposes a Spectre.Console CLI and a Blazor Web UI.
@@ -11,7 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **.NET 10**, C#
 - **SQLite + Dapper** (no Entity Framework)
 - **Spectre.Console** for the CLI
-- **Blazor Web App** for the UI
+- **Blazor Web App** with **MudBlazor** for the UI
 - **Serilog** for logging (console + file)
 - **xUnit** for tests
 
@@ -61,7 +73,7 @@ dotnet test --filter "FullyQualifiedName~VehicleRepository"
 
 **CLI** (`CommandVault.Cli`): Spectre.Console commands follow the pattern `commandvault <noun> <verb>` (e.g. `commandvault vehicle list`). Commands depend on `CommandVault.Core` interfaces; repositories are injected.
 
-**Web** (`CommandVault.Web`): Blazor pages at `/`, `/vehicles`, `/fuel`, `/maintenance`, `/expenses`, `/import-export`. Shares the same repository interfaces as the CLI.
+**Web** (`CommandVault.Web`): Blazor pages at `/`, `/vehicles`, `/vehicles/{id}`, `/fuel`, `/maintenance`, `/expenses`, `/import-export`. Uses MudBlazor components — MudDataGrid for tables, MudDialog for add/edit forms and confirmations, MudSnackbar for feedback, MudChart for dashboard charts. Shares the same repository interfaces as the CLI.
 
 **ImportExport** (`CommandVault.ImportExport`): CSV and JSON round-trips for all four entity types. Must validate imported rows, skip invalid ones, and return an import summary.
 

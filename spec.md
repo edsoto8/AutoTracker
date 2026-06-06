@@ -30,6 +30,10 @@ All data will be stored locally in SQLite and accessed through Dapper.
 * Blazor Web App
 * Spectre.Console CLI
 
+## UI
+
+* MudBlazor
+
 ## Data
 
 * SQLite
@@ -297,6 +301,91 @@ AutoTracker.db
 * MaintenanceLogs
 * Expenses
 
+## Schema
+
+> TODO: To be finalized before implementation. See discussion below.
+
+### Vehicles
+
+| Column         | Type    | Constraints              |
+|----------------|---------|--------------------------|
+| Id             | INTEGER | PRIMARY KEY AUTOINCREMENT |
+| Name           | TEXT    | NOT NULL                 |
+| Year           | INTEGER | NOT NULL                 |
+| Make           | TEXT    | NOT NULL                 |
+| Model          | TEXT    | NOT NULL                 |
+| VIN            | TEXT    | NULL                     |
+| LicensePlate   | TEXT    | NULL                     |
+| FuelType       | TEXT    | NOT NULL                 |
+| TankCapacity   | REAL    | NULL                     |
+
+### FuelLogs
+
+| Column      | Type    | Constraints                        |
+|-------------|---------|------------------------------------|
+| Id          | INTEGER | PRIMARY KEY AUTOINCREMENT          |
+| VehicleId   | INTEGER | NOT NULL, FK → Vehicles(Id)        |
+| Date        | TEXT    | NOT NULL (ISO 8601)                |
+| Odometer    | INTEGER | NOT NULL                           |
+| Gallons     | REAL    | NOT NULL                           |
+| TotalCost   | REAL    | NOT NULL                           |
+| FuelStation | TEXT    | NULL                               |
+| Notes       | TEXT    | NULL                               |
+
+### MaintenanceLogs
+
+| Column      | Type    | Constraints                        |
+|-------------|---------|------------------------------------|
+| Id          | INTEGER | PRIMARY KEY AUTOINCREMENT          |
+| VehicleId   | INTEGER | NOT NULL, FK → Vehicles(Id)        |
+| Date        | TEXT    | NOT NULL (ISO 8601)                |
+| Odometer    | INTEGER | NOT NULL                           |
+| ServiceType | TEXT    | NOT NULL                           |
+| Description | TEXT    | NULL                               |
+| Cost        | REAL    | NOT NULL                           |
+| Vendor      | TEXT    | NULL                               |
+| Notes       | TEXT    | NULL                               |
+
+### Expenses
+
+| Column      | Type    | Constraints                        |
+|-------------|---------|------------------------------------|
+| Id          | INTEGER | PRIMARY KEY AUTOINCREMENT          |
+| VehicleId   | INTEGER | NOT NULL, FK → Vehicles(Id)        |
+| Date        | TEXT    | NOT NULL (ISO 8601)                |
+| Category    | TEXT    | NOT NULL                           |
+| Description | TEXT    | NOT NULL                           |
+| Amount      | REAL    | NOT NULL                           |
+| Notes       | TEXT    | NULL                               |
+
+## Cascade Delete Behavior
+
+> TODO: To be finalized before implementation.
+
+## Field Validation Rules
+
+> TODO: To be finalized before implementation.
+
+## Computed Value Formulas
+
+> TODO: To be finalized before implementation.
+
+## Default Sort Orders
+
+> TODO: To be finalized before implementation.
+
+## Post-Action Navigation
+
+> TODO: To be finalized before implementation.
+
+## Empty / Zero State
+
+> TODO: To be finalized before implementation.
+
+## CLI UX Mode
+
+> TODO: To be finalized before implementation.
+
 ---
 
 # Data Access
@@ -343,26 +432,35 @@ AutoTracker export
 
 # Web Application Requirements
 
-Pages:
+Use MudBlazor as the component library.
+
+## Pages
 
 ```text
-/
-Dashboard
-
-/vehicles
-/fuel
-/maintenance
-/expenses
-/import-export
+/                   Dashboard
+/vehicles           Vehicle list
+/vehicles/{id}      Vehicle detail (fuel, maintenance, expenses in tabs)
+/fuel               Fuel log list (all vehicles)
+/maintenance        Maintenance log list (all vehicles)
+/expenses           Expense list (all vehicles)
+/import-export      Import and export
 ```
 
-Requirements:
+## Requirements
 
-* Responsive UI
-* Form validation
-* Search and filtering
-* Data tables
-* Confirmation dialogs
+* Responsive layout using MudBlazor's grid system
+* Form validation with inline field errors
+* Success/failure feedback via MudSnackbar
+* Confirmation dialogs via MudDialog before deletes
+* Data tables with sorting, filtering by vehicle and date range, and pagination
+* Add/edit forms open in MudDialog overlays (not separate pages)
+* Dark/light theme toggle
+
+## Dashboard Charts (MudChart)
+
+* MPG over time — line chart, per vehicle
+* Monthly fuel cost — bar chart
+* Expense breakdown by category — donut chart
 
 ---
 
