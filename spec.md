@@ -303,68 +303,132 @@ AutoTracker.db
 
 ## Schema
 
-> TODO: To be finalized before implementation. See discussion below.
+SQLite has no native date type. Dates are stored as `TEXT` in ISO 8601 format (`YYYY-MM-DD`); Dapper maps these to C# `DateTime` automatically.
+
+`FuelType` and `ServiceType` are stored as `TEXT` but constrained to fixed enum values enforced at the application layer.
 
 ### Vehicles
 
-| Column         | Type    | Constraints              |
-|----------------|---------|--------------------------|
-| Id             | INTEGER | PRIMARY KEY AUTOINCREMENT |
-| Name           | TEXT    | NOT NULL                 |
-| Year           | INTEGER | NOT NULL                 |
-| Make           | TEXT    | NOT NULL                 |
-| Model          | TEXT    | NOT NULL                 |
-| VIN            | TEXT    | NULL                     |
-| LicensePlate   | TEXT    | NULL                     |
-| FuelType       | TEXT    | NOT NULL                 |
-| TankCapacity   | REAL    | NULL                     |
+| Column       | Type    | Constraints               |
+|--------------|---------|---------------------------|
+| Id           | INTEGER | PRIMARY KEY AUTOINCREMENT |
+| Name         | TEXT    | NOT NULL                  |
+| Year         | INTEGER | NOT NULL                  |
+| Make         | TEXT    | NOT NULL                  |
+| Model        | TEXT    | NOT NULL                  |
+| VIN          | TEXT    | NULL                      |
+| LicensePlate | TEXT    | NULL                      |
+| FuelType     | TEXT    | NOT NULL                  |
+| TankCapacity | REAL    | NULL (informational only) |
+
+**FuelType enum values:** `Gasoline`, `Diesel`, `Electric`, `Hybrid`, `Other`
 
 ### FuelLogs
 
-| Column      | Type    | Constraints                        |
-|-------------|---------|------------------------------------|
-| Id          | INTEGER | PRIMARY KEY AUTOINCREMENT          |
-| VehicleId   | INTEGER | NOT NULL, FK → Vehicles(Id)        |
-| Date        | TEXT    | NOT NULL (ISO 8601)                |
-| Odometer    | INTEGER | NOT NULL                           |
-| Gallons     | REAL    | NOT NULL                           |
-| TotalCost   | REAL    | NOT NULL                           |
-| FuelStation | TEXT    | NULL                               |
-| Notes       | TEXT    | NULL                               |
+| Column      | Type    | Constraints                 |
+|-------------|---------|-----------------------------|
+| Id          | INTEGER | PRIMARY KEY AUTOINCREMENT   |
+| VehicleId   | INTEGER | NOT NULL, FK → Vehicles(Id) |
+| Date        | TEXT    | NOT NULL (ISO 8601)         |
+| Odometer    | INTEGER | NOT NULL                    |
+| Gallons     | REAL    | NOT NULL                    |
+| TotalCost   | REAL    | NOT NULL                    |
+| FuelStation | TEXT    | NULL                        |
+| Notes       | TEXT    | NULL                        |
+
+**Indexes:** `VehicleId`, `Date`
 
 ### MaintenanceLogs
 
-| Column      | Type    | Constraints                        |
-|-------------|---------|------------------------------------|
-| Id          | INTEGER | PRIMARY KEY AUTOINCREMENT          |
-| VehicleId   | INTEGER | NOT NULL, FK → Vehicles(Id)        |
-| Date        | TEXT    | NOT NULL (ISO 8601)                |
-| Odometer    | INTEGER | NOT NULL                           |
-| ServiceType | TEXT    | NOT NULL                           |
-| Description | TEXT    | NULL                               |
-| Cost        | REAL    | NOT NULL                           |
-| Vendor      | TEXT    | NULL                               |
-| Notes       | TEXT    | NULL                               |
+| Column      | Type    | Constraints                 |
+|-------------|---------|-----------------------------|
+| Id          | INTEGER | PRIMARY KEY AUTOINCREMENT   |
+| VehicleId   | INTEGER | NOT NULL, FK → Vehicles(Id) |
+| Date        | TEXT    | NOT NULL (ISO 8601)         |
+| Odometer    | INTEGER | NOT NULL                    |
+| ServiceType | TEXT    | NOT NULL                    |
+| Description | TEXT    | NULL                        |
+| Cost        | REAL    | NOT NULL                    |
+| Vendor      | TEXT    | NULL                        |
+| Notes       | TEXT    | NULL                        |
+
+**ServiceType enum values:** `Oil Change`, `Tire Rotation`, `Brake Service`, `Air Filter`, `Battery`, `Inspection`, `Other`
+
+**Indexes:** `VehicleId`, `Date`
 
 ### Expenses
 
-| Column      | Type    | Constraints                        |
-|-------------|---------|------------------------------------|
-| Id          | INTEGER | PRIMARY KEY AUTOINCREMENT          |
-| VehicleId   | INTEGER | NOT NULL, FK → Vehicles(Id)        |
-| Date        | TEXT    | NOT NULL (ISO 8601)                |
-| Category    | TEXT    | NOT NULL                           |
-| Description | TEXT    | NOT NULL                           |
-| Amount      | REAL    | NOT NULL                           |
-| Notes       | TEXT    | NULL                               |
+| Column      | Type    | Constraints                 |
+|-------------|---------|-----------------------------|
+| Id          | INTEGER | PRIMARY KEY AUTOINCREMENT   |
+| VehicleId   | INTEGER | NOT NULL, FK → Vehicles(Id) |
+| Date        | TEXT    | NOT NULL (ISO 8601)         |
+| Category    | TEXT    | NOT NULL                    |
+| Description | TEXT    | NOT NULL                    |
+| Amount      | REAL    | NOT NULL                    |
+| Notes       | TEXT    | NULL                        |
 
-## Cascade Delete Behavior
+**Category enum values:** `Fuel`, `Maintenance`, `Insurance`, `Registration`, `Parking`, `Tolls`, `Repairs`, `Other`
 
-> TODO: To be finalized before implementation.
+**Indexes:** `VehicleId`, `Date`
+
+## Delete Behavior
+
+Deleting a vehicle is **blocked** if it has any associated fuel logs, maintenance logs, or expenses. The user must remove all child records first. No cascade deletes — orphaned data is not acceptable.
+
+Foreign keys are enforced via `PRAGMA foreign_keys = ON` at connection open time.
+
+Deleting a fuel log, maintenance log, or expense is always permitted (no dependents).
 
 ## Field Validation Rules
 
-> TODO: To be finalized before implementation.
+### Vehicles
+
+| Field        | Rule                                              |
+|--------------|---------------------------------------------------|
+| Name         | Required, max 100 chars                           |
+| Year         | Required, 1885 – current year + 1                 |
+| Make         | Required, max 100 chars                           |
+| Model        | Required, max 100 chars                           |
+| VIN          | Optional, max 17 chars                            |
+| LicensePlate | Optional, max 20 chars                            |
+| FuelType     | Required, must be a valid enum value              |
+| TankCapacity | Optional, must be > 0 if provided                 |
+
+### Fuel Logs
+
+| Field       | Rule                                               |
+|-------------|----------------------------------------------------|
+| Date        | Required, valid date, not in the future            |
+| Odometer    | Required, must be > 0                              |
+| Gallons     | Required, must be > 0                              |
+| TotalCost   | Required, must be > 0                              |
+| FuelStation | Optional, max 200 chars                            |
+| Notes       | Optional, max 200 chars                            |
+
+**Odometer ordering:** If the entered odometer is less than or equal to the most recent prior entry for that vehicle, show a **warning** (not a hard block) — the record is still saved. This accommodates backfilling historical data. During legacy import, the ordering check is skipped entirely.
+
+### Maintenance Logs
+
+| Field       | Rule                                               |
+|-------------|----------------------------------------------------|
+| Date        | Required, valid date, not in the future            |
+| Odometer    | Required, must be > 0                              |
+| ServiceType | Required, must be a valid enum value               |
+| Cost        | Required, must be ≥ 0 (free services are allowed)  |
+| Description | Optional, max 200 chars                            |
+| Vendor      | Optional, max 200 chars                            |
+| Notes       | Optional, max 200 chars                            |
+
+### Expenses
+
+| Field       | Rule                                               |
+|-------------|----------------------------------------------------|
+| Date        | Required, valid date, not in the future            |
+| Category    | Required, must be a valid enum value               |
+| Description | Required, max 200 chars                            |
+| Amount      | Required, must be > 0                              |
+| Notes       | Optional, max 200 chars                            |
 
 ## Computed Value Formulas
 
