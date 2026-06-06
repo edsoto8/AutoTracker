@@ -4,6 +4,7 @@
 @inject IVehicleRepository VehicleRepo
 @inject IFuelLogRepository FuelRepo
 @inject IMaintenanceRepository MaintenanceRepo
+@inject IExpenseRepository ExpenseRepo
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
@@ -60,13 +61,19 @@ else
         </MudItem>
         <MudItem xs="12" sm="6" md="4">
             <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Total Expenses</MudText>
+                <MudText Typo="Typo.h5">@(_totalExpenses > 0 ? $"${_totalExpenses:F2}" : "—")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Vehicles Tracked</MudText>
                 <MudText Typo="Typo.h5">@_vehicles.Count</MudText>
             </MudPaper>
         </MudItem>
     </MudGrid>
 
-    @if (_mpgSeries.Count == 0 && _monthlyCostSeries.Count == 0)
+    @if (_mpgSeries.Count == 0 && _monthlyCostSeries.Count == 0 && _donutSeries.Count == 0)
     {
         <MudAlert Severity="Severity.Info" Class="mb-6">
             No fuel logs yet. Add fuel logs to see charts.
@@ -96,6 +103,17 @@ else
                                              ChartLabels="_monthlyCostLabels"
                                              Width="100%" Height="280px"
                                              ChartOptions="_barOptions" />
+                    </MudPaper>
+                </MudItem>
+            }
+            @if (_donutSeries.Count > 0)
+            {
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-4" Elevation="2">
+                        <MudText Typo="Typo.subtitle1" Class="mb-2">Expense Breakdown by Category</MudText>
+                        <MudBlazor.Charts.Donut ChartSeries="_donutSeries"
+                                               ChartLabels="_donutLabels"
+                                               Width="100%" Height="280px" />
                     </MudPaper>
                 </MudItem>
             }
@@ -181,6 +199,7 @@ else
 
     private decimal _totalFuelCost;
     private decimal _totalMaintenanceCost;
+    private decimal _totalExpenses;
     private decimal? _avgMpg;
     private int _totalMiles;
     private decimal? _costPerMile;
@@ -192,6 +211,8 @@ else
     private string[] _mpgLabels = [];
     private List<ChartSeries<double>> _monthlyCostSeries = [];
     private string[] _monthlyCostLabels = [];
+    private List<ChartSeries<double>> _donutSeries = [];
+    private string[] _donutLabels = [];
 
     private readonly LineChartOptions _lineOptions = new() { YAxisTicks = 5 };
     private readonly BarChartOptions _barOptions = new() { YAxisTicks = 5 };
@@ -205,16 +226,19 @@ else
 
         var fuelLogsTask = FuelRepo.GetAllAsync();
         var maintenanceTask = MaintenanceRepo.GetAllAsync();
-        await Task.WhenAll(fuelLogsTask, maintenanceTask);
+        var expensesTask = ExpenseRepo.GetAllAsync();
+        await Task.WhenAll(fuelLogsTask, maintenanceTask, expensesTask);
 
         var allFuelLogs = (await fuelLogsTask).ToList();
         var allMaintenance = (await maintenanceTask).ToList();
+        var allExpenses = (await expensesTask).ToList();
 
         var calculated = FuelLogCalculator.Calculate(allFuelLogs)
             .OrderByDescending(l => l.Date).ThenByDescending(l => l.Odometer).ToList();
 
         _totalFuelCost = allFuelLogs.Sum(l => l.TotalCost);
         _totalMaintenanceCost = allMaintenance.Sum(l => l.Cost);
+        _totalExpenses = allExpenses.Sum(e => e.Amount);
         _totalMiles = calculated.Where(l => l.MilesSinceLastFillup.HasValue).Sum(l => l.MilesSinceLastFillup!.Value);
 
         var mpgValues = calculated.Where(l => l.Mpg.HasValue).Select(l => l.Mpg!.Value).ToList();
@@ -226,6 +250,7 @@ else
 
         BuildMpgChart(calculated);
         BuildMonthlyCostChart(allFuelLogs);
+        BuildExpenseDonutChart(allExpenses);
 
         _loading = false;
     }
@@ -276,5 +301,23 @@ else
                 Data = monthly.Select(g => (double)g.Sum(l => l.TotalCost)).ToArray()
             }
         ];
+    }
+
+    private void BuildExpenseDonutChart(IEnumerable<Expense> expenses)
+    {
+        var byCategory = expenses
+            .GroupBy(e => e.Category)
+            .Where(g => g.Sum(e => e.Amount) > 0)
+            .OrderByDescending(g => g.Sum(e => e.Amount))
+            .ToList();
+
+        if (byCategory.Count == 0) return;
+
+        _donutLabels = byCategory.Select(g => g.Key.ToString()).ToArray();
+        _donutSeries = byCategory.Select(g => new ChartSeries<double>
+        {
+            Name = g.Key.ToString(),
+            Data = new double[] { (double)g.Sum(e => e.Amount) }
+        }).ToList();
     }
 }

@@ -1,0 +1,145 @@
+@page "/expenses"
+@rendermode InteractiveServer
+@inject IVehicleRepository VehicleRepo
+@inject IExpenseRepository ExpenseRepo
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Expenses — AutoTracker</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4" Spacing="2">
+    <MudText Typo="Typo.h4">Expenses</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+               OnClick="OpenAddDialog">Add Expense</MudButton>
+</MudStack>
+
+<MudSelect T="int" Value="_filterVehicleId" Label="Filter by Vehicle"
+           AnchorOrigin="Origin.BottomLeft" Class="mb-4" Style="max-width:320px;"
+           ValueChanged="@((int id) => OnVehicleFilterChanged(id))">
+    <MudSelectItem Value="0">All Vehicles</MudSelectItem>
+    @foreach (var v in _vehicles)
+    {
+        <MudSelectItem Value="v.Id">@v.Name (@v.Year @v.Make @v.Model)</MudSelectItem>
+    }
+</MudSelect>
+
+@if (_expenses is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_expenses.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">
+        No expenses found. Use <strong>Add Expense</strong> to record one.
+    </MudAlert>
+}
+else
+{
+    <MudDataGrid T="Expense" Items="_expenses" Dense="true" Hover="true" Striped="true" Elevation="2">
+        <Columns>
+            <PropertyColumn Property="x => x.Date" Title="Date" Format="yyyy-MM-dd" />
+            <TemplateColumn Title="Vehicle" SortBy="x => _vehicleMap.GetValueOrDefault(x.VehicleId, string.Empty)">
+                <CellTemplate>@_vehicleMap.GetValueOrDefault(context.Item.VehicleId, "?")</CellTemplate>
+            </TemplateColumn>
+            <PropertyColumn Property="x => x.Category" Title="Category" />
+            <PropertyColumn Property="x => x.Description" Title="Description" />
+            <TemplateColumn Title="Amount" SortBy="x => x.Amount">
+                <CellTemplate>$@context.Item.Amount.ToString("F2")</CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="Notes" SortBy="x => x.Notes">
+                <CellTemplate>
+                    @if (context.Item.Notes is not null)
+                    { @context.Item.Notes }
+                    else
+                    { <MudText Color="Color.Secondary" Typo="Typo.body2">—</MudText> }
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="" CellClass="d-flex justify-end gap-1" Sortable="false" Filterable="false">
+                <CellTemplate>
+                    <MudTooltip Text="Edit">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       OnClick="@(() => OpenEditDialog(context.Item))" />
+                    </MudTooltip>
+                    <MudTooltip Text="Delete">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                       Color="Color.Error" OnClick="@(() => DeleteExpense(context.Item))" />
+                    </MudTooltip>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+    </MudDataGrid>
+}
+
+@code {
+    private List<Expense>? _expenses;
+    private List<Vehicle> _vehicles = [];
+    private Dictionary<int, string> _vehicleMap = [];
+    private int _filterVehicleId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _vehicles = (await VehicleRepo.GetAllAsync()).ToList();
+        _vehicleMap = _vehicles.ToDictionary(v => v.Id, v => v.Name);
+        await LoadExpensesAsync();
+    }
+
+    private async Task LoadExpensesAsync()
+    {
+        IEnumerable<Expense> raw = _filterVehicleId > 0
+            ? await ExpenseRepo.GetByVehicleIdAsync(_filterVehicleId)
+            : await ExpenseRepo.GetAllAsync();
+
+        _expenses = raw.OrderByDescending(e => e.Date).ToList();
+    }
+
+    private async Task OnVehicleFilterChanged(int vehicleId)
+    {
+        _filterVehicleId = vehicleId;
+        await LoadExpensesAsync();
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters<ExpenseDialog>
+        {
+            { x => x.PreselectedVehicleId, _filterVehicleId }
+        };
+        var dialog = await DialogService.ShowAsync<ExpenseDialog>("Add Expense", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadExpensesAsync();
+            Snackbar.Add("Expense added.", Severity.Success);
+        }
+    }
+
+    private async Task OpenEditDialog(Expense expense)
+    {
+        var parameters = new DialogParameters<ExpenseDialog> { { x => x.Expense, expense } };
+        var dialog = await DialogService.ShowAsync<ExpenseDialog>("Edit Expense", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadExpensesAsync();
+            Snackbar.Add("Expense updated.", Severity.Success);
+        }
+    }
+
+    private async Task DeleteExpense(Expense expense)
+    {
+        var confirmParams = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Message, $"Delete \"{expense.Description}\" on {expense.Date:yyyy-MM-dd}? This cannot be undone." },
+            { x => x.ConfirmText, "Delete" }
+        };
+        var confirmDialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Expense", confirmParams);
+        var confirmed = await confirmDialog.Result;
+        if (confirmed is { Canceled: false })
+        {
+            await ExpenseRepo.DeleteAsync(expense.Id);
+            await LoadExpensesAsync();
+            Snackbar.Add("Expense deleted.", Severity.Success);
+        }
+    }
+}

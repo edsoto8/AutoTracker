@@ -3,6 +3,7 @@
 @inject IVehicleRepository VehicleRepo
 @inject IFuelLogRepository FuelRepo
 @inject IMaintenanceRepository MaintenanceRepo
+@inject IExpenseRepository ExpenseRepo
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
@@ -165,7 +166,50 @@ else
             }
         </MudTabPanel>
         <MudTabPanel Text="Expenses" Icon="@Icons.Material.Filled.Receipt">
-            <MudText Color="Color.Secondary">Expense data available in the Expenses iteration.</MudText>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddExpenseDialog" Class="mb-3">Add Expense</MudButton>
+
+            @if (_expenses is null)
+            {
+                <MudProgressCircular Indeterminate="true" />
+            }
+            else if (_expenses.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info">No expenses for this vehicle yet.</MudAlert>
+            }
+            else
+            {
+                <MudDataGrid T="Expense" Items="_expenses" Dense="true" Hover="true" Striped="true" Elevation="0">
+                    <Columns>
+                        <PropertyColumn Property="x => x.Date" Title="Date" Format="yyyy-MM-dd" />
+                        <PropertyColumn Property="x => x.Category" Title="Category" />
+                        <PropertyColumn Property="x => x.Description" Title="Description" />
+                        <TemplateColumn Title="Amount" SortBy="x => x.Amount">
+                            <CellTemplate>$@context.Item.Amount.ToString("F2")</CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="Notes" SortBy="x => x.Notes">
+                            <CellTemplate>
+                                @if (context.Item.Notes is not null)
+                                { @context.Item.Notes }
+                                else
+                                { <MudText Color="Color.Secondary" Typo="Typo.body2">—</MudText> }
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="" CellClass="d-flex justify-end gap-1" Sortable="false" Filterable="false">
+                            <CellTemplate>
+                                <MudTooltip Text="Edit">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                                   OnClick="@(() => OpenEditExpenseDialog(context.Item))" />
+                                </MudTooltip>
+                                <MudTooltip Text="Delete">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                                   Color="Color.Error" OnClick="@(() => DeleteExpense(context.Item))" />
+                                </MudTooltip>
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                </MudDataGrid>
+            }
         </MudTabPanel>
     </MudTabs>
 }
@@ -176,6 +220,7 @@ else
     private Vehicle? _vehicle;
     private List<FuelLog>? _fuelLogs;
     private List<MaintenanceLog>? _maintenanceLogs;
+    private List<Expense>? _expenses;
 
     private List<BreadcrumbItem> _breadcrumbs =
     [
@@ -188,7 +233,7 @@ else
         _vehicle = await VehicleRepo.GetByIdAsync(Id);
         if (_vehicle is not null)
             _breadcrumbs[1] = new BreadcrumbItem(_vehicle.Name, href: null, disabled: true);
-        await Task.WhenAll(LoadFuelLogsAsync(), LoadMaintenanceLogsAsync());
+        await Task.WhenAll(LoadFuelLogsAsync(), LoadMaintenanceLogsAsync(), LoadExpensesAsync());
     }
 
     private async Task LoadFuelLogsAsync()
@@ -202,6 +247,12 @@ else
     {
         var logs = await MaintenanceRepo.GetByVehicleIdAsync(Id);
         _maintenanceLogs = logs.OrderByDescending(l => l.Date).ThenByDescending(l => l.Odometer).ToList();
+    }
+
+    private async Task LoadExpensesAsync()
+    {
+        var expenses = await ExpenseRepo.GetByVehicleIdAsync(Id);
+        _expenses = expenses.OrderByDescending(e => e.Date).ToList();
     }
 
     private async Task OpenEditDialog()
@@ -295,6 +346,47 @@ else
             await MaintenanceRepo.DeleteAsync(log.Id);
             await LoadMaintenanceLogsAsync();
             Snackbar.Add("Maintenance log deleted.", Severity.Success);
+        }
+    }
+
+    private async Task OpenAddExpenseDialog()
+    {
+        var parameters = new DialogParameters<ExpenseDialog> { { x => x.PreselectedVehicleId, Id } };
+        var dialog = await DialogService.ShowAsync<ExpenseDialog>("Add Expense", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadExpensesAsync();
+            Snackbar.Add("Expense added.", Severity.Success);
+        }
+    }
+
+    private async Task OpenEditExpenseDialog(Expense expense)
+    {
+        var parameters = new DialogParameters<ExpenseDialog> { { x => x.Expense, expense } };
+        var dialog = await DialogService.ShowAsync<ExpenseDialog>("Edit Expense", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadExpensesAsync();
+            Snackbar.Add("Expense updated.", Severity.Success);
+        }
+    }
+
+    private async Task DeleteExpense(Expense expense)
+    {
+        var confirmParams = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Message, $"Delete \"{expense.Description}\" on {expense.Date:yyyy-MM-dd}? This cannot be undone." },
+            { x => x.ConfirmText, "Delete" }
+        };
+        var confirmDialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Expense", confirmParams);
+        var confirmed = await confirmDialog.Result;
+        if (confirmed is { Canceled: false })
+        {
+            await ExpenseRepo.DeleteAsync(expense.Id);
+            await LoadExpensesAsync();
+            Snackbar.Add("Expense deleted.", Severity.Success);
         }
     }
 }

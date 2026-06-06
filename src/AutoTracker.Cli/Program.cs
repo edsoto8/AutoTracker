@@ -1,4 +1,5 @@
 using AutoTracker.Cli.Commands;
+using AutoTracker.Cli.Commands.Expenses;
 using AutoTracker.Cli.Commands.Fuel;
 using AutoTracker.Cli.Commands.Maintenance;
 using AutoTracker.Cli.Commands.Vehicles;
@@ -32,6 +33,10 @@ services.AddTransient<MaintenanceAddCommand>();
 services.AddTransient<MaintenanceEditCommand>();
 services.AddTransient<MaintenanceDeleteCommand>();
 services.AddTransient<SummaryCommand>();
+services.AddTransient<ExpenseListCommand>();
+services.AddTransient<ExpenseAddCommand>();
+services.AddTransient<ExpenseEditCommand>();
+services.AddTransient<ExpenseDeleteCommand>();
 
 var registrar = new TypeRegistrar(services);
 var app = new CommandApp(registrar);
@@ -59,6 +64,15 @@ app.Configure(config =>
     });
 
     config.AddCommand<SummaryCommand>("summary").WithDescription("Show summary metrics");
+
+    config.AddBranch("expense", expense =>
+    {
+        expense.SetDescription("Manage expenses");
+        expense.AddCommand<ExpenseListCommand>("list").WithDescription("List all expenses");
+        expense.AddCommand<ExpenseAddCommand>("add").WithDescription("Add an expense");
+        expense.AddCommand<ExpenseEditCommand>("edit").WithDescription("Edit an expense");
+        expense.AddCommand<ExpenseDeleteCommand>("delete").WithDescription("Delete an expense");
+    });
 
     config.AddBranch("maintenance", maintenance =>
     {
