@@ -4,15 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-**Do not write any code yet.** The spec has open TODO sections that must be finalized first:
-- Database schema (column types, nullability, indexes)
-- Cascade delete behavior
-- Field validation rules
-- Computed value formulas
-- Default sort orders
-- Post-action navigation
-- Empty/zero state handling
-- CLI UX mode (interactive vs flag-based)
+Spec is complete. Ready for implementation.
 
 ## Project
 

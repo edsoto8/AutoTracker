@@ -432,23 +432,67 @@ Deleting a fuel log, maintenance log, or expense is always permitted (no depende
 
 ## Computed Value Formulas
 
-> TODO: To be finalized before implementation.
+Computed on read in `CommandVault.Core`, never stored in the database.
+
+### Miles Since Last Fill-Up
+
+```
+MilesSinceLastFillup = CurrentOdometer - PreviousOdometer
+```
+
+- Entries ordered by `Date` ascending, then `Odometer` ascending as a tiebreaker.
+- First entry for a vehicle has no previous odometer — value is `null`, displayed as `N/A`.
+
+### MPG
+
+```
+MPG = MilesSinceLastFillup / Gallons
+```
+
+- `null` (displayed as `N/A`) if `MilesSinceLastFillup` is null (first entry).
+
+### Cost Per Mile
+
+```
+CostPerMile = TotalCost / MilesSinceLastFillup
+```
+
+- `null` (displayed as `N/A`) if `MilesSinceLastFillup` is null or zero (first entry).
 
 ## Default Sort Orders
 
-> TODO: To be finalized before implementation.
+| View                        | Default Sort                              |
+|-----------------------------|-------------------------------------------|
+| Vehicles                    | Name ascending                            |
+| Fuel Logs                   | Date descending, Odometer descending      |
+| Maintenance Logs            | Date descending                           |
+| Expenses                    | Date descending                           |
+| Dashboard recent activity   | Date descending, limit 5 rows per section |
 
 ## Post-Action Navigation
 
-> TODO: To be finalized before implementation.
+| Action                        | Result                                                                 |
+|-------------------------------|------------------------------------------------------------------------|
+| Add any record                | Close dialog, stay on current list, success snackbar (auto-dismiss)    |
+| Edit any record               | Close dialog, stay on current page, success snackbar (auto-dismiss)    |
+| Delete any record             | Close confirmation dialog, stay on current page, record disappears     |
+| Delete vehicle (blocked)      | Show error snackbar, dialog stays open, no navigation                  |
+
+Success snackbars auto-dismiss after 3 seconds. Error snackbars persist until dismissed.
 
 ## Empty / Zero State
 
-> TODO: To be finalized before implementation.
+| View                                      | Empty State                                                                 |
+|-------------------------------------------|-----------------------------------------------------------------------------|
+| Dashboard — no vehicles                   | "Add your first vehicle to get started" with an Add Vehicle button          |
+| Dashboard — vehicles exist, no logs       | Metrics show `N/A`, charts hidden with "No data yet" message                |
+| Vehicle list — no vehicles                | "Add your first vehicle to get started" with an Add Vehicle button          |
+| Fuel / Maintenance / Expense lists        | "No records yet. Add one to get started."                                   |
+| Vehicle detail tabs — no records          | "No [fuel logs / maintenance records / expenses] for this vehicle yet."     |
 
 ## CLI UX Mode
 
-> TODO: To be finalized before implementation.
+Interactive — Spectre.Console prompts for each field one at a time. No flags required. Commands guide the user through input with validation at each step, re-prompting on invalid input.
 
 ---
 
