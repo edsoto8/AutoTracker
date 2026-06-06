@@ -47,8 +47,10 @@ public class ExpenseEditCommand : AsyncCommand
 
         selected.Category = AnsiConsole.Prompt(
             new SelectionPrompt<ExpenseCategory>()
-                .Title($"Category [grey](current: {selected.Category})[/]:")
-                .AddChoices(Enum.GetValues<ExpenseCategory>()));
+                .Title($"Category [grey](current: {selected.Category} — press Enter to keep)[/]:")
+                .AddChoices(Enum.GetValues<ExpenseCategory>()
+                    .OrderBy(c => c != selected.Category)
+                    .ThenBy(c => c)));
 
         var desc = AnsiConsole.Prompt(
             new TextPrompt<string>($"Description [grey](current: {selected.Description})[/]:")

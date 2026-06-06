@@ -314,10 +314,13 @@ else
         if (byCategory.Count == 0) return;
 
         _donutLabels = byCategory.Select(g => g.Key.ToString()).ToArray();
-        _donutSeries = byCategory.Select(g => new ChartSeries<double>
-        {
-            Name = g.Key.ToString(),
-            Data = new double[] { (double)g.Sum(e => e.Amount) }
-        }).ToList();
+        _donutSeries =
+        [
+            new ChartSeries<double>
+            {
+                Name = "Expenses",
+                Data = byCategory.Select(g => (double)g.Sum(e => e.Amount)).ToArray()
+            }
+        ];
     }
 }

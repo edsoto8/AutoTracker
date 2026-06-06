@@ -52,8 +52,10 @@ public class MaintenanceEditCommand : AsyncCommand
 
         selected.ServiceType = AnsiConsole.Prompt(
             new SelectionPrompt<ServiceType>()
-                .Title($"Service type [grey](current: {selected.ServiceType})[/]:")
-                .AddChoices(Enum.GetValues<ServiceType>()));
+                .Title($"Service type [grey](current: {selected.ServiceType} — press Enter to keep)[/]:")
+                .AddChoices(Enum.GetValues<ServiceType>()
+                    .OrderBy(s => s != selected.ServiceType)
+                    .ThenBy(s => s)));
 
         var desc = AnsiConsole.Ask($"Description [grey](current: {selected.Description ?? "none"})[/]:", selected.Description ?? string.Empty);
         selected.Description = string.IsNullOrWhiteSpace(desc) ? null : desc;
