@@ -1,6 +1,7 @@
 @page "/vehicles/{Id:int}"
 @rendermode InteractiveServer
 @inject IVehicleRepository VehicleRepo
+@inject IFuelLogRepository FuelRepo
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
@@ -46,7 +47,67 @@ else
 
     <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true">
         <MudTabPanel Text="Fuel Logs" Icon="@Icons.Material.Filled.LocalGasStation">
-            <MudText Color="Color.Secondary">Fuel log data available in the Fuel Logs iteration.</MudText>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddFuelDialog" Class="mb-3">Add Fuel Log</MudButton>
+
+            @if (_fuelLogs is null)
+            {
+                <MudProgressCircular Indeterminate="true" />
+            }
+            else if (_fuelLogs.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info">No fuel logs for this vehicle yet.</MudAlert>
+            }
+            else
+            {
+                <MudDataGrid T="FuelLog" Items="_fuelLogs" Dense="true" Hover="true" Striped="true" Elevation="0">
+                    <Columns>
+                        <PropertyColumn Property="x => x.Date" Title="Date" Format="yyyy-MM-dd" />
+                        <PropertyColumn Property="x => x.Odometer" Title="Odometer" Format="N0" />
+                        <PropertyColumn Property="x => x.Gallons" Title="Gallons" Format="F3" />
+                        <TemplateColumn Title="Total Cost" SortBy="x => x.TotalCost">
+                            <CellTemplate>$@context.Item.TotalCost.ToString("F2")</CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="MPG" SortBy="x => x.Mpg">
+                            <CellTemplate>
+                                @if (context.Item.Mpg.HasValue)
+                                { @context.Item.Mpg.Value.ToString("F1") }
+                                else
+                                { <MudText Color="Color.Secondary" Typo="Typo.body2">N/A</MudText> }
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="¢/Mile" SortBy="x => x.CostPerMile">
+                            <CellTemplate>
+                                @if (context.Item.CostPerMile.HasValue)
+                                { @((context.Item.CostPerMile.Value * 100).ToString("F1")) }
+                                else
+                                { <MudText Color="Color.Secondary" Typo="Typo.body2">N/A</MudText> }
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="Mi Since Fill" SortBy="x => x.MilesSinceLastFillup">
+                            <CellTemplate>
+                                @if (context.Item.MilesSinceLastFillup.HasValue)
+                                { @context.Item.MilesSinceLastFillup.Value.ToString("N0") }
+                                else
+                                { <MudText Color="Color.Secondary" Typo="Typo.body2">N/A</MudText> }
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <PropertyColumn Property="x => x.FuelStation" Title="Station" />
+                        <TemplateColumn Title="" CellClass="d-flex justify-end gap-1" Sortable="false" Filterable="false">
+                            <CellTemplate>
+                                <MudTooltip Text="Edit">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                                   OnClick="@(() => OpenEditFuelDialog(context.Item))" />
+                                </MudTooltip>
+                                <MudTooltip Text="Delete">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                                   Color="Color.Error" OnClick="@(() => DeleteFuelLog(context.Item))" />
+                                </MudTooltip>
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                </MudDataGrid>
+            }
         </MudTabPanel>
         <MudTabPanel Text="Maintenance" Icon="@Icons.Material.Filled.Build">
             <MudText Color="Color.Secondary">Maintenance data available in the Maintenance iteration.</MudText>
@@ -61,6 +122,7 @@ else
     [Parameter] public int Id { get; set; }
 
     private Vehicle? _vehicle;
+    private List<FuelLog>? _fuelLogs;
 
     private List<BreadcrumbItem> _breadcrumbs =
     [
@@ -73,6 +135,14 @@ else
         _vehicle = await VehicleRepo.GetByIdAsync(Id);
         if (_vehicle is not null)
             _breadcrumbs[1] = new BreadcrumbItem(_vehicle.Name, href: null, disabled: true);
+        await LoadFuelLogsAsync();
+    }
+
+    private async Task LoadFuelLogsAsync()
+    {
+        var logs = await FuelRepo.GetByVehicleIdAsync(Id);
+        _fuelLogs = AutoTracker.Core.Calculations.FuelLogCalculator.Calculate(logs)
+            .OrderByDescending(l => l.Date).ThenByDescending(l => l.Odometer).ToList();
     }
 
     private async Task OpenEditDialog()
@@ -84,6 +154,47 @@ else
         {
             _vehicle = await VehicleRepo.GetByIdAsync(Id);
             Snackbar.Add("Vehicle updated.", Severity.Success);
+        }
+    }
+
+    private async Task OpenAddFuelDialog()
+    {
+        var parameters = new DialogParameters<FuelLogDialog> { { x => x.PreselectedVehicleId, Id } };
+        var dialog = await DialogService.ShowAsync<FuelLogDialog>("Add Fuel Log", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadFuelLogsAsync();
+            Snackbar.Add("Fuel log added.", Severity.Success);
+        }
+    }
+
+    private async Task OpenEditFuelDialog(FuelLog log)
+    {
+        var parameters = new DialogParameters<FuelLogDialog> { { x => x.FuelLog, log } };
+        var dialog = await DialogService.ShowAsync<FuelLogDialog>("Edit Fuel Log", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadFuelLogsAsync();
+            Snackbar.Add("Fuel log updated.", Severity.Success);
+        }
+    }
+
+    private async Task DeleteFuelLog(FuelLog log)
+    {
+        var confirmParams = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Message, $"Delete fuel log for {log.Date:yyyy-MM-dd}? This cannot be undone." },
+            { x => x.ConfirmText, "Delete" }
+        };
+        var confirmDialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Fuel Log", confirmParams);
+        var confirmed = await confirmDialog.Result;
+        if (confirmed is { Canceled: false })
+        {
+            await FuelRepo.DeleteAsync(log.Id);
+            await LoadFuelLogsAsync();
+            Snackbar.Add("Fuel log deleted.", Severity.Success);
         }
     }
 }

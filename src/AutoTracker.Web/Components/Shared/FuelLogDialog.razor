@@ -1,0 +1,136 @@
+@inject IVehicleRepository VehicleRepo
+@inject IFuelLogRepository FuelRepo
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudGrid Spacing="2">
+                <MudItem xs="12">
+                    <MudSelect T="int" Value="_model.VehicleId" Label="Vehicle" Required="true"
+                               RequiredError="Vehicle is required." Disabled="@(PreselectedVehicleId > 0)"
+                               AnchorOrigin="Origin.BottomLeft"
+                               ValueChanged="@((int id) => OnVehicleChanged(id))">
+                        @foreach (var v in _vehicles)
+                        {
+                            <MudSelectItem Value="v.Id">@v.Name (@v.Year @v.Make @v.Model)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker @bind-Date="_date" Label="Date" Required="true"
+                                   MaxDate="DateTime.Today" DateFormat="yyyy-MM-dd" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="int" Value="_model.Odometer" Label="Odometer (miles)"
+                                     Required="true" Min="1" Immediate="true"
+                                     ValueChanged="@((int v) => OnOdometerChanged(v))" />
+                </MudItem>
+                @if (_odometerWarning is not null)
+                {
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Warning" Dense="true">@_odometerWarning</MudAlert>
+                    </MudItem>
+                }
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="_model.Gallons" Label="Gallons" Required="true"
+                                     Min="0.001m" Format="F3" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="_model.TotalCost" Label="Total Cost ($)" Required="true"
+                                     Min="0.01m" Format="F2" />
+                </MudItem>
+                @if (_model.Gallons > 0 && _model.TotalCost > 0)
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Price per gallon: $@((_model.TotalCost / _model.Gallons).ToString("F3"))
+                        </MudText>
+                    </MudItem>
+                }
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_model.FuelStation" Label="Fuel Station (optional)" MaxLength="200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_model.Notes" Label="Notes (optional)" MaxLength="200" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public FuelLog? FuelLog { get; set; }
+    [Parameter] public int PreselectedVehicleId { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private FuelLog _model = new();
+    private DateTime? _date;
+    private List<Vehicle> _vehicles = [];
+    private string? _odometerWarning;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _vehicles = (await VehicleRepo.GetAllAsync()).ToList();
+
+        if (FuelLog is not null)
+        {
+            _model = new FuelLog
+            {
+                Id = FuelLog.Id, VehicleId = FuelLog.VehicleId, Odometer = FuelLog.Odometer,
+                Gallons = FuelLog.Gallons, TotalCost = FuelLog.TotalCost,
+                FuelStation = FuelLog.FuelStation, Notes = FuelLog.Notes
+            };
+            _date = FuelLog.Date;
+        }
+        else
+        {
+            _model = new FuelLog { VehicleId = PreselectedVehicleId };
+            _date = DateTime.Today;
+        }
+    }
+
+    private async Task OnVehicleChanged(int vehicleId)
+    {
+        _model.VehicleId = vehicleId;
+        await CheckOdometerWarning();
+    }
+
+    private async Task OnOdometerChanged(int value)
+    {
+        _model.Odometer = value;
+        await CheckOdometerWarning();
+    }
+
+    private async Task CheckOdometerWarning()
+    {
+        if (_model.VehicleId == 0 || _model.Odometer <= 0) { _odometerWarning = null; return; }
+        var latest = await FuelRepo.GetLatestByVehicleIdAsync(_model.VehicleId);
+        if (latest is not null && latest.Id != _model.Id && _model.Odometer <= latest.Odometer)
+            _odometerWarning = $"Previous entry has odometer {latest.Odometer:N0}. Entry will still be saved.";
+        else
+            _odometerWarning = null;
+    }
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_isValid || _date is null) return;
+
+        _model.Date = _date.Value;
+
+        if (FuelLog is null)
+            await FuelRepo.AddAsync(_model);
+        else
+            await FuelRepo.UpdateAsync(_model);
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
