@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@inject IJSRuntime JS
 
 <MudLayout>
     <MudAppBar Elevation="1">
@@ -33,6 +34,21 @@
     private bool isDarkMode;
     private MudThemeProvider _themeProvider = null!;
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var stored = await JS.InvokeAsync<string?>("localStorage.getItem", "darkMode");
+            isDarkMode = stored == "true";
+            StateHasChanged();
+        }
+    }
+
     private void DrawerToggle() => drawerOpen = !drawerOpen;
-    private void ToggleTheme() => isDarkMode = !isDarkMode;
+
+    private async Task ToggleTheme()
+    {
+        isDarkMode = !isDarkMode;
+        await JS.InvokeVoidAsync("localStorage.setItem", "darkMode", isDarkMode.ToString().ToLower());
+    }
 }

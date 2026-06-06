@@ -10,7 +10,20 @@ using AutoTracker.Data;
 using AutoTracker.Data.Database;
 using AutoTracker.Data.Repositories;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 using Spectre.Console.Cli;
+
+var logDir = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+    ".autotracker", "logs");
+
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .WriteTo.File(Path.Combine(logDir, "cli-.txt"), rollingInterval: RollingInterval.Day,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .CreateLogger();
+
+Log.Information("AutoTracker CLI starting");
 
 var connectionString = DatabasePath.GetConnectionString();
 DatabaseInitializer.Initialize(connectionString);
@@ -98,4 +111,16 @@ app.Configure(config =>
     });
 });
 
-return await app.RunAsync(args);
+try
+{
+    return await app.RunAsync(args);
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "CLI terminated unexpectedly");
+    return 1;
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
+}

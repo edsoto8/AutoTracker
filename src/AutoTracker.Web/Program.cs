@@ -4,8 +4,21 @@ using AutoTracker.Data.Database;
 using AutoTracker.Data.Repositories;
 using AutoTracker.Web.Components;
 using MudBlazor.Services;
+using Serilog;
+
+var logDir = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+    ".autotracker", "logs");
+
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .WriteTo.Console(outputTemplate: "{Timestamp:HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .WriteTo.File(Path.Combine(logDir, "web-.txt"), rollingInterval: RollingInterval.Day,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseSerilog();
 
 var connectionString = DatabasePath.GetConnectionString();
 DatabaseInitializer.Initialize(connectionString);
@@ -35,4 +48,17 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-app.Run();
+Log.Information("AutoTracker Web starting");
+
+try
+{
+    app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Web host terminated unexpectedly");
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
+}
