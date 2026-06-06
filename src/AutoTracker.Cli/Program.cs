@@ -1,3 +1,4 @@
+using AutoTracker.Cli.Commands;
 using AutoTracker.Cli.Commands.Fuel;
 using AutoTracker.Cli.Commands.Maintenance;
 using AutoTracker.Cli.Commands.Vehicles;
@@ -30,6 +31,7 @@ services.AddTransient<MaintenanceListCommand>();
 services.AddTransient<MaintenanceAddCommand>();
 services.AddTransient<MaintenanceEditCommand>();
 services.AddTransient<MaintenanceDeleteCommand>();
+services.AddTransient<SummaryCommand>();
 
 var registrar = new TypeRegistrar(services);
 var app = new CommandApp(registrar);
@@ -55,6 +57,8 @@ app.Configure(config =>
         fuel.AddCommand<FuelEditCommand>("edit").WithDescription("Edit a fuel log entry");
         fuel.AddCommand<FuelDeleteCommand>("delete").WithDescription("Delete a fuel log entry");
     });
+
+    config.AddCommand<SummaryCommand>("summary").WithDescription("Show summary metrics");
 
     config.AddBranch("maintenance", maintenance =>
     {

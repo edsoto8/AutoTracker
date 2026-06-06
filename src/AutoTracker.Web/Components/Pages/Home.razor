@@ -1,7 +1,280 @@
 @page "/"
 @rendermode InteractiveServer
+@using AutoTracker.Core.Calculations
+@inject IVehicleRepository VehicleRepo
+@inject IFuelLogRepository FuelRepo
+@inject IMaintenanceRepository MaintenanceRepo
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 <PageTitle>Dashboard — AutoTracker</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-2">Dashboard</MudText>
-<MudText Typo="Typo.body1" Color="Color.Secondary">Summary charts and metrics will appear here in a future iteration.</MudText>
+<MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
+
+@if (_loading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_vehicles.Count == 0)
+{
+    <MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="2">
+        <MudIcon Icon="@Icons.Material.Filled.DirectionsCar" Size="Size.Large" Color="Color.Secondary" Class="mb-3" />
+        <MudText Typo="Typo.h6" Class="mb-2">No vehicles yet</MudText>
+        <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">Add your first vehicle to get started.</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   Href="/vehicles">Add Vehicle</MudButton>
+    </MudPaper>
+}
+else
+{
+    <MudGrid Spacing="3" Class="mb-6">
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Total Fuel Cost</MudText>
+                <MudText Typo="Typo.h5">@(_totalFuelCost > 0 ? $"${_totalFuelCost:F2}" : "—")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Total Maintenance Cost</MudText>
+                <MudText Typo="Typo.h5">@(_totalMaintenanceCost > 0 ? $"${_totalMaintenanceCost:F2}" : "—")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Average MPG</MudText>
+                <MudText Typo="Typo.h5">@(_avgMpg.HasValue ? _avgMpg.Value.ToString("F1") : "N/A")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Total Miles Driven</MudText>
+                <MudText Typo="Typo.h5">@(_totalMiles > 0 ? _totalMiles.ToString("N0") : "N/A")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Cost Per Mile</MudText>
+                <MudText Typo="Typo.h5">@(_costPerMile.HasValue ? $"${_costPerMile.Value:F4}" : "N/A")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Vehicles Tracked</MudText>
+                <MudText Typo="Typo.h5">@_vehicles.Count</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @if (_mpgSeries.Count == 0 && _monthlyCostSeries.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info" Class="mb-6">
+            No fuel logs yet. Add fuel logs to see charts.
+        </MudAlert>
+    }
+    else
+    {
+        <MudGrid Spacing="3" Class="mb-6">
+            @if (_mpgSeries.Count > 0)
+            {
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-4" Elevation="2">
+                        <MudText Typo="Typo.subtitle1" Class="mb-2">MPG Over Time (per fill-up)</MudText>
+                        <MudBlazor.Charts.Line ChartSeries="_mpgSeries"
+                                              ChartLabels="_mpgLabels"
+                                              Width="100%" Height="280px"
+                                              ChartOptions="_lineOptions" />
+                    </MudPaper>
+                </MudItem>
+            }
+            @if (_monthlyCostSeries.Count > 0)
+            {
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-4" Elevation="2">
+                        <MudText Typo="Typo.subtitle1" Class="mb-2">Monthly Fuel Cost</MudText>
+                        <MudBlazor.Charts.Bar ChartSeries="_monthlyCostSeries"
+                                             ChartLabels="_monthlyCostLabels"
+                                             Width="100%" Height="280px"
+                                             ChartOptions="_barOptions" />
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">Recent Fuel Logs</MudText>
+                @if (_recentFuelLogs.Count == 0)
+                {
+                    <MudText Color="Color.Secondary" Typo="Typo.body2">No fuel logs yet.</MudText>
+                }
+                else
+                {
+                    <MudSimpleTable Dense="true" Hover="true">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Vehicle</th>
+                                <th>Odometer</th>
+                                <th>Cost</th>
+                                <th>MPG</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var log in _recentFuelLogs)
+                            {
+                                <tr>
+                                    <td>@log.Date.ToString("yyyy-MM-dd")</td>
+                                    <td>@_vehicleMap.GetValueOrDefault(log.VehicleId, "?")</td>
+                                    <td>@log.Odometer.ToString("N0")</td>
+                                    <td>$@log.TotalCost.ToString("F2")</td>
+                                    <td>@(log.Mpg.HasValue ? log.Mpg.Value.ToString("F1") : "N/A")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">Recent Maintenance</MudText>
+                @if (_recentMaintenance.Count == 0)
+                {
+                    <MudText Color="Color.Secondary" Typo="Typo.body2">No maintenance logs yet.</MudText>
+                }
+                else
+                {
+                    <MudSimpleTable Dense="true" Hover="true">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Vehicle</th>
+                                <th>Service</th>
+                                <th>Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var log in _recentMaintenance)
+                            {
+                                <tr>
+                                    <td>@log.Date.ToString("yyyy-MM-dd")</td>
+                                    <td>@_vehicleMap.GetValueOrDefault(log.VehicleId, "?")</td>
+                                    <td>@log.ServiceType</td>
+                                    <td>$@log.Cost.ToString("F2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private bool _loading = true;
+    private List<Vehicle> _vehicles = [];
+    private Dictionary<int, string> _vehicleMap = [];
+
+    private decimal _totalFuelCost;
+    private decimal _totalMaintenanceCost;
+    private decimal? _avgMpg;
+    private int _totalMiles;
+    private decimal? _costPerMile;
+
+    private List<FuelLog> _recentFuelLogs = [];
+    private List<MaintenanceLog> _recentMaintenance = [];
+
+    private List<ChartSeries<double>> _mpgSeries = [];
+    private string[] _mpgLabels = [];
+    private List<ChartSeries<double>> _monthlyCostSeries = [];
+    private string[] _monthlyCostLabels = [];
+
+    private readonly LineChartOptions _lineOptions = new() { YAxisTicks = 5 };
+    private readonly BarChartOptions _barOptions = new() { YAxisTicks = 5 };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _vehicles = (await VehicleRepo.GetAllAsync()).ToList();
+        _vehicleMap = _vehicles.ToDictionary(v => v.Id, v => v.Name);
+
+        if (_vehicles.Count == 0) { _loading = false; return; }
+
+        var fuelLogsTask = FuelRepo.GetAllAsync();
+        var maintenanceTask = MaintenanceRepo.GetAllAsync();
+        await Task.WhenAll(fuelLogsTask, maintenanceTask);
+
+        var allFuelLogs = (await fuelLogsTask).ToList();
+        var allMaintenance = (await maintenanceTask).ToList();
+
+        var calculated = FuelLogCalculator.Calculate(allFuelLogs)
+            .OrderByDescending(l => l.Date).ThenByDescending(l => l.Odometer).ToList();
+
+        _totalFuelCost = allFuelLogs.Sum(l => l.TotalCost);
+        _totalMaintenanceCost = allMaintenance.Sum(l => l.Cost);
+        _totalMiles = calculated.Where(l => l.MilesSinceLastFillup.HasValue).Sum(l => l.MilesSinceLastFillup!.Value);
+
+        var mpgValues = calculated.Where(l => l.Mpg.HasValue).Select(l => l.Mpg!.Value).ToList();
+        _avgMpg = mpgValues.Count > 0 ? mpgValues.Average() : null;
+        _costPerMile = _totalMiles > 0 ? (_totalFuelCost + _totalMaintenanceCost) / _totalMiles : null;
+
+        _recentFuelLogs = calculated.Take(5).ToList();
+        _recentMaintenance = allMaintenance.OrderByDescending(l => l.Date).Take(5).ToList();
+
+        BuildMpgChart(calculated);
+        BuildMonthlyCostChart(allFuelLogs);
+
+        _loading = false;
+    }
+
+    private void BuildMpgChart(IEnumerable<FuelLog> calculatedLogs)
+    {
+        var withMpg = calculatedLogs
+            .Where(l => l.Mpg.HasValue)
+            .GroupBy(l => l.VehicleId)
+            .Where(g => g.Any())
+            .ToList();
+
+        if (withMpg.Count == 0) return;
+
+        var maxCount = withMpg.Max(g => g.Count());
+        _mpgLabels = Enumerable.Range(1, maxCount).Select(i => i.ToString()).ToArray();
+
+        _mpgSeries = withMpg.Select(g =>
+        {
+            var ordered = g.OrderBy(l => l.Date).ThenBy(l => l.Odometer).ToList();
+            var data = ordered.Select(l => (double)l.Mpg!.Value)
+                              .Concat(Enumerable.Repeat(0.0, maxCount - ordered.Count))
+                              .ToArray();
+            return new ChartSeries<double>
+            {
+                Name = _vehicleMap.GetValueOrDefault(g.Key, "Vehicle"),
+                Data = data
+            };
+        }).ToList();
+    }
+
+    private void BuildMonthlyCostChart(IEnumerable<FuelLog> fuelLogs)
+    {
+        var monthly = fuelLogs
+            .GroupBy(l => new DateTime(l.Date.Year, l.Date.Month, 1))
+            .OrderBy(g => g.Key)
+            .TakeLast(6)
+            .ToList();
+
+        if (monthly.Count == 0) return;
+
+        _monthlyCostLabels = monthly.Select(g => g.Key.ToString("MMM yy")).ToArray();
+        _monthlyCostSeries =
+        [
+            new ChartSeries<double>
+            {
+                Name = "Fuel Cost ($)",
+                Data = monthly.Select(g => (double)g.Sum(l => l.TotalCost)).ToArray()
+            }
+        ];
+    }
+}
