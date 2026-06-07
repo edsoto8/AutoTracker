@@ -223,7 +223,7 @@ else
     private string[] _donutLabels = [];
 
     private readonly LineChartOptions _lineOptions = new() { YAxisTicks = 5 };
-    private readonly BarChartOptions _barOptions = new() { YAxisTicks = 5 };
+    private readonly BarChartOptions _barOptions = new() { YAxisTicks = 5, YAxisFormat = "$0" };
 
     protected override async Task OnInitializedAsync()
     {

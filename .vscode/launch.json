@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Web: AutoTracker.Web",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "${workspaceFolder}/src/AutoTracker.Web/AutoTracker.Web.csproj"
+        },
+        {
+            "name": "CLI: AutoTracker.Cli",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "${workspaceFolder}/src/AutoTracker.Cli/AutoTracker.Cli.csproj",
+            "args": []
+        }
+    ]
+}
