@@ -1,5 +1,6 @@
 using AutoTracker.Core.Calculations;
 using AutoTracker.Core.Interfaces;
+
 using Spectre.Console;
 using Spectre.Console.Cli;
 

@@ -18,7 +18,10 @@ public class FuelLogRepositoryTests : IDisposable
         var vehicleRepo = new VehicleRepository(_fixture.ConnectionFactory);
         _vehicleId = vehicleRepo.AddAsync(new Vehicle
         {
-            Name = "Test Vehicle", Year = 2022, Make = "Toyota", Model = "Camry",
+            Name = "Test Vehicle",
+            Year = 2022,
+            Make = "Toyota",
+            Model = "Camry",
             FuelType = FuelType.Gasoline
         }).GetAwaiter().GetResult();
     }

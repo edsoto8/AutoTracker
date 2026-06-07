@@ -1,7 +1,7 @@
 using AutoTracker.Cli.Commands;
 using AutoTracker.Cli.Commands.Expenses;
-using AutoTracker.Cli.Commands.ImportExport;
 using AutoTracker.Cli.Commands.Fuel;
+using AutoTracker.Cli.Commands.ImportExport;
 using AutoTracker.Cli.Commands.Maintenance;
 using AutoTracker.Cli.Commands.Vehicles;
 using AutoTracker.Cli.Infrastructure;
@@ -9,8 +9,11 @@ using AutoTracker.Core.Interfaces;
 using AutoTracker.Data;
 using AutoTracker.Data.Database;
 using AutoTracker.Data.Repositories;
+
 using Microsoft.Extensions.DependencyInjection;
+
 using Serilog;
+
 using Spectre.Console.Cli;
 
 var logDir = Path.Combine(

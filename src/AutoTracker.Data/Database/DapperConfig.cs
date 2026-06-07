@@ -1,6 +1,8 @@
 using System.Data;
 using System.Globalization;
+
 using AutoTracker.Core.Enums;
+
 using Dapper;
 
 namespace AutoTracker.Data.Database;

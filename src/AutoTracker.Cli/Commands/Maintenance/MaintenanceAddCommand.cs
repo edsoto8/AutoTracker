@@ -1,6 +1,7 @@
 using AutoTracker.Core.Enums;
 using AutoTracker.Core.Interfaces;
 using AutoTracker.Core.Models;
+
 using Spectre.Console;
 using Spectre.Console.Cli;
 

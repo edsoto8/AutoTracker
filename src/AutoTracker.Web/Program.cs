@@ -3,7 +3,9 @@ using AutoTracker.Data;
 using AutoTracker.Data.Database;
 using AutoTracker.Data.Repositories;
 using AutoTracker.Web.Components;
+
 using MudBlazor.Services;
+
 using Serilog;
 
 var logDir = Path.Combine(

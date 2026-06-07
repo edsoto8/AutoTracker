@@ -1,5 +1,6 @@
 using AutoTracker.Data;
 using AutoTracker.Data.Database;
+
 using Microsoft.Data.Sqlite;
 
 namespace AutoTracker.Data.Tests;

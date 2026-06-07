@@ -1,5 +1,6 @@
 using AutoTracker.Core.Interfaces;
 using AutoTracker.Core.Models;
+
 using Dapper;
 
 namespace AutoTracker.Data.Repositories;
