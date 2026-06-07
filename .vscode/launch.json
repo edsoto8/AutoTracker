@@ -3,16 +3,27 @@
     "configurations": [
         {
             "name": "Web: AutoTracker.Web",
-            "type": "dotnet",
+            "type": "coreclr",
             "request": "launch",
-            "projectPath": "${workspaceFolder}/src/AutoTracker.Web/AutoTracker.Web.csproj"
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/AutoTracker.Web/bin/Debug/net10.0/AutoTracker.Web.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/AutoTracker.Web",
+            "stopAtEntry": false,
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development"
+            }
         },
         {
             "name": "CLI: AutoTracker.Cli",
-            "type": "dotnet",
+            "type": "coreclr",
             "request": "launch",
-            "projectPath": "${workspaceFolder}/src/AutoTracker.Cli/AutoTracker.Cli.csproj",
-            "args": []
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/AutoTracker.Cli/bin/Debug/net10.0/AutoTracker.Cli.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/AutoTracker.Cli",
+            "stopAtEntry": false,
+            "console": "integratedTerminal"
         }
     ]
 }

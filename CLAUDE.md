@@ -22,7 +22,7 @@ Spec is complete. Implementation in progress.
 ## Solution Structure
 
 ```
-AutoTracker.sln
+AutoTracker.slnx
 src/
   AutoTracker.Core          # Domain models, interfaces
   AutoTracker.Data          # Dapper repositories, SQLite schema
