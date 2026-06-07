@@ -1,5 +1,4 @@
 @page "/"
-@rendermode InteractiveServer
 @using AutoTracker.Core.Calculations
 @inject IVehicleRepository VehicleRepo
 @inject IFuelLogRepository FuelRepo
@@ -67,6 +66,12 @@ else
         </MudItem>
         <MudItem xs="12" sm="6" md="4">
             <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Avg $/Gallon (@_avgPriceLabel)</MudText>
+                <MudText Typo="Typo.h5">@(_avgPricePerGallon.HasValue ? $"${_avgPricePerGallon.Value:F3}" : "N/A")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Vehicles Tracked</MudText>
                 <MudText Typo="Typo.h5">@_vehicles.Count</MudText>
             </MudPaper>
@@ -98,7 +103,7 @@ else
             {
                 <MudItem xs="12" md="6">
                     <MudPaper Class="pa-4" Elevation="2">
-                        <MudText Typo="Typo.subtitle1" Class="mb-2">Monthly Fuel Cost</MudText>
+                        <MudText Typo="Typo.subtitle1" Class="mb-2">Monthly Fuel Cost (@_monthlyCostRangeLabel)</MudText>
                         <MudBlazor.Charts.Bar ChartSeries="_monthlyCostSeries"
                                              ChartLabels="_monthlyCostLabels"
                                              Width="100%" Height="280px"
@@ -201,8 +206,11 @@ else
     private decimal _totalMaintenanceCost;
     private decimal _totalExpenses;
     private decimal? _avgMpg;
+    private decimal? _avgPricePerGallon;
+    private string _avgPriceLabel = "12 mo";
     private int _totalMiles;
     private decimal? _costPerMile;
+    private string _monthlyCostRangeLabel = "";
 
     private List<FuelLog> _recentFuelLogs = [];
     private List<MaintenanceLog> _recentMaintenance = [];
@@ -248,6 +256,7 @@ else
         _recentFuelLogs = calculated.Take(5).ToList();
         _recentMaintenance = allMaintenance.OrderByDescending(l => l.Date).Take(5).ToList();
 
+        BuildAvgPricePerGallon(allFuelLogs);
         BuildMpgChart(calculated);
         BuildMonthlyCostChart(allFuelLogs);
         BuildExpenseDonutChart(allExpenses);
@@ -282,17 +291,43 @@ else
         }).ToList();
     }
 
+    private void BuildAvgPricePerGallon(IEnumerable<FuelLog> fuelLogs)
+    {
+        var cutoff = DateTime.Today.AddMonths(-12);
+        var recent = fuelLogs.Where(l => l.Date >= cutoff).ToList();
+
+        if (recent.Count == 0)
+        {
+            // fall back to all-time if no data in last 12 months
+            var all = fuelLogs.ToList();
+            var totalGallons = all.Sum(l => l.Gallons);
+            _avgPricePerGallon = totalGallons > 0 ? all.Sum(l => l.TotalCost) / totalGallons : null;
+            _avgPriceLabel = "all time";
+        }
+        else
+        {
+            var totalGallons = recent.Sum(l => l.Gallons);
+            _avgPricePerGallon = totalGallons > 0 ? recent.Sum(l => l.TotalCost) / totalGallons : null;
+            _avgPriceLabel = "12 mo";
+        }
+    }
+
     private void BuildMonthlyCostChart(IEnumerable<FuelLog> fuelLogs)
     {
+        const int maxMonths = 24;
         var monthly = fuelLogs
             .GroupBy(l => new DateTime(l.Date.Year, l.Date.Month, 1))
             .OrderBy(g => g.Key)
-            .TakeLast(6)
+            .TakeLast(maxMonths)
             .ToList();
 
         if (monthly.Count == 0) return;
 
         _monthlyCostLabels = monthly.Select(g => g.Key.ToString("MMM yy")).ToArray();
+        _monthlyCostRangeLabel = monthly.Count == 1
+            ? monthly[0].Key.ToString("MMM yyyy")
+            : $"{monthly[0].Key:MMM yyyy} – {monthly[^1].Key:MMM yyyy}";
+
         _monthlyCostSeries =
         [
             new ChartSeries<double>

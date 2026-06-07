@@ -1,5 +1,4 @@
 @page "/fuel"
-@rendermode InteractiveServer
 @inject IVehicleRepository VehicleRepo
 @inject IFuelLogRepository FuelRepo
 @inject IDialogService DialogService
@@ -49,6 +48,9 @@ else
             <PropertyColumn Property="x => x.Gallons" Title="Gallons" Format="F3" />
             <TemplateColumn Title="Total Cost" SortBy="x => x.TotalCost">
                 <CellTemplate>$@context.Item.TotalCost.ToString("F2")</CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="$/Gal" SortBy="x => x.PricePerGallon">
+                <CellTemplate>$@context.Item.PricePerGallon.ToString("F3")</CellTemplate>
             </TemplateColumn>
             <TemplateColumn Title="MPG" SortBy="x => x.Mpg">
                 <CellTemplate>

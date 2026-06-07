@@ -11,6 +11,8 @@ public class FuelLog
     public string? FuelStation { get; set; }
     public string? Notes { get; set; }
 
+    public decimal PricePerGallon => Gallons > 0 ? TotalCost / Gallons : 0;
+
     // Computed on read by FuelLogCalculator — null for the first entry per vehicle
     public int? MilesSinceLastFillup { get; set; }
     public decimal? Mpg { get; set; }
