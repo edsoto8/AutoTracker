@@ -73,6 +73,36 @@ public class FuelLogCalculatorTests
     }
 
     [Fact]
+    public void ZeroMilesDriven_CostPerMileIsNull()
+    {
+        var date = new DateTime(2024, 1, 1);
+        var logs = new[]
+        {
+            MakeLog(1, date, odometer: 10000, gallons: 10, totalCost: 40),
+            MakeLog(2, date, odometer: 10000, gallons: 10, totalCost: 40),
+        };
+
+        var result = FuelLogCalculator.Calculate(logs);
+
+        Assert.Equal(0, result[1].MilesSinceLastFillup);
+        Assert.Null(result[1].CostPerMile);
+    }
+
+    [Fact]
+    public void ZeroGallons_MpgIsNull()
+    {
+        var logs = new[]
+        {
+            MakeLog(1, new DateTime(2024, 1, 1), odometer: 10000, gallons: 10, totalCost: 40),
+            MakeLog(2, new DateTime(2024, 2, 1), odometer: 10300, gallons: 0, totalCost: 0),
+        };
+
+        var result = FuelLogCalculator.Calculate(logs);
+
+        Assert.Null(result[1].Mpg);
+    }
+
+    [Fact]
     public void EmptyInput_ReturnsEmptyList()
     {
         var result = FuelLogCalculator.Calculate([]);

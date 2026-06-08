@@ -121,6 +121,32 @@ public class DataImporterTests
     }
 
     [Fact]
+    public void ImportFuelLogsCsv_InvalidDate_SkipsRow()
+    {
+        const string csv =
+            "Id,VehicleId,Date,Odometer,Gallons,TotalCost,FuelStation,Notes\n" +
+            "1,1,not-a-date,50000,10.5,38.50,,\n";
+
+        var (_, result) = DataImporter.ImportFuelLogsCsv(csv, VehicleIds);
+
+        Assert.Equal(0, result.Imported);
+        Assert.Single(result.Skipped);
+    }
+
+    [Fact]
+    public void ImportFuelLogsCsv_ZeroOdometer_SkipsRow()
+    {
+        const string csv =
+            "Id,VehicleId,Date,Odometer,Gallons,TotalCost,FuelStation,Notes\n" +
+            "1,1,2024-01-01,0,10.5,38.50,,\n";
+
+        var (_, result) = DataImporter.ImportFuelLogsCsv(csv, VehicleIds);
+
+        Assert.Equal(0, result.Imported);
+        Assert.Single(result.Skipped);
+    }
+
+    [Fact]
     public void ImportFuelLogsCsv_EmptyContent_ReturnsEmpty()
     {
         var (logs, result) = DataImporter.ImportFuelLogsCsv(string.Empty, VehicleIds);
@@ -214,6 +240,46 @@ public class DataImporterTests
         Assert.Single(result.Skipped);
     }
 
+    [Fact]
+    public void ImportMaintenanceLogsCsv_InvalidDate_SkipsRow()
+    {
+        const string csv =
+            "Id,VehicleId,Date,Odometer,ServiceType,Description,Cost,Vendor,Notes\n" +
+            "1,1,not-a-date,55000,OilChange,Desc,45.00,,\n";
+
+        var (_, result) = DataImporter.ImportMaintenanceLogsCsv(csv, VehicleIds);
+
+        Assert.Equal(0, result.Imported);
+        Assert.Single(result.Skipped);
+    }
+
+    [Fact]
+    public void ImportMaintenanceLogsCsv_ZeroCost_Imports()
+    {
+        const string csv =
+            "Id,VehicleId,Date,Odometer,ServiceType,Description,Cost,Vendor,Notes\n" +
+            "1,1,2024-05-10,55000,Inspection,Free inspection,0.00,,\n";
+
+        var (logs, result) = DataImporter.ImportMaintenanceLogsCsv(csv, VehicleIds);
+
+        Assert.Equal(1, result.Imported);
+        Assert.Single(logs);
+        Assert.Equal(0m, logs[0].Cost);
+    }
+
+    [Fact]
+    public void ImportMaintenanceLogsCsv_NegativeCost_SkipsRow()
+    {
+        const string csv =
+            "Id,VehicleId,Date,Odometer,ServiceType,Description,Cost,Vendor,Notes\n" +
+            "1,1,2024-05-10,55000,OilChange,Desc,-10.00,,\n";
+
+        var (_, result) = DataImporter.ImportMaintenanceLogsCsv(csv, VehicleIds);
+
+        Assert.Equal(0, result.Imported);
+        Assert.Single(result.Skipped);
+    }
+
     // ── JSON Import ───────────────────────────────────────────────────────────
 
     [Fact]
@@ -265,5 +331,54 @@ public class DataImporterTests
         Assert.Equal(1, result.Imported);
         Assert.Single(expenses);
         Assert.Equal(ExpenseCategory.Insurance, expenses[0].Category);
+    }
+
+    [Fact]
+    public void ImportExpensesJson_InvalidJson_ReturnsSkipped()
+    {
+        var (expenses, result) = DataImporter.ImportExpensesJson("not json", VehicleIds);
+
+        Assert.Empty(expenses);
+        Assert.Equal(0, result.Imported);
+        Assert.Single(result.Skipped);
+    }
+
+    [Fact]
+    public void ImportMaintenanceLogsJson_ValidJson_Imports()
+    {
+        const string json =
+            "[{\"Id\":1,\"VehicleId\":1,\"Date\":\"2024-05-10\",\"Odometer\":55000," +
+            "\"ServiceType\":\"OilChange\",\"Cost\":45.00}]";
+
+        var (logs, result) = DataImporter.ImportMaintenanceLogsJson(json, VehicleIds);
+
+        Assert.Equal(1, result.Imported);
+        Assert.Single(logs);
+        Assert.Equal(ServiceType.OilChange, logs[0].ServiceType);
+        Assert.Equal(55000, logs[0].Odometer);
+    }
+
+    [Fact]
+    public void ImportMaintenanceLogsJson_UnknownVehicleId_Filtered()
+    {
+        const string json =
+            "[{\"Id\":1,\"VehicleId\":1,\"Date\":\"2024-05-10\",\"Odometer\":55000,\"ServiceType\":\"OilChange\",\"Cost\":45.00}," +
+            "{\"Id\":2,\"VehicleId\":99,\"Date\":\"2024-05-11\",\"Odometer\":56000,\"ServiceType\":\"OilChange\",\"Cost\":45.00}]";
+
+        var (logs, result) = DataImporter.ImportMaintenanceLogsJson(json, VehicleIds);
+
+        Assert.Equal(1, result.Imported);
+        Assert.Single(logs);
+        Assert.Single(result.Skipped);
+    }
+
+    [Fact]
+    public void ImportMaintenanceLogsJson_InvalidJson_ReturnsSkipped()
+    {
+        var (logs, result) = DataImporter.ImportMaintenanceLogsJson("not json", VehicleIds);
+
+        Assert.Empty(logs);
+        Assert.Equal(0, result.Imported);
+        Assert.Single(result.Skipped);
     }
 }
