@@ -57,6 +57,45 @@ dotnet test tests/AutoTracker.Data.Tests
 dotnet test --filter "FullyQualifiedName~VehicleRepository"
 ```
 
+## Formatting
+
+```bash
+# Format entire solution
+dotnet format
+
+# Format and verify (no changes written — useful in CI)
+dotnet format --verify-no-changes
+
+# Format a single project
+dotnet format src/AutoTracker.Web
+```
+
+Run `dotnet format` before committing to keep style consistent.
+
+## Package Management
+
+```bash
+# Check for outdated packages (built-in)
+dotnet list package --outdated
+
+# Install the dotnet-outdated global tool (one-time)
+dotnet tool install -g dotnet-outdated-tool
+
+# Show outdated packages
+dotnet outdated
+
+# Update minor/patch versions only (safer, avoids breaking major changes)
+dotnet outdated -u:Minor
+
+# Update all packages (review changes carefully)
+dotnet outdated -u
+```
+
+After updating packages, always rebuild and test:
+```bash
+dotnet build && dotnet test
+```
+
 ## Architecture Notes
 
 **Data layer** (`AutoTracker.Data`): Repository pattern via interfaces defined in `AutoTracker.Core` (`IVehicleRepository`, `IFuelLogRepository`, `IMaintenanceRepository`, `IExpenseRepository`). Concrete implementations use Dapper against a single SQLite file (`autotracker.db`). Schema migrations are owned by this project.
