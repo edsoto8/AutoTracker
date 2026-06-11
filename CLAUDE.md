@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-Spec is complete. Implementation in progress.
+Spec is complete. Implementation is complete for all features in `spec.md`.
+
+A post-implementation audit was captured in `spec2.md` — review it before resuming development. It covers testing gaps (CLI commands and Blazor pages have zero test coverage), data integrity issues (no import transactions, no duplicate detection, no `ON DELETE RESTRICT`), missing error handling in Blazor pages, and lower-priority polish items (dark/light theme toggle, date range filtering, pagination).
 
 ## Project
 
